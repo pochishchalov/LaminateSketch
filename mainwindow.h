@@ -13,6 +13,11 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+struct DrawableLayer{
+    QPolygonF polyline_;
+    domain::ORIENTATION orientation_ = domain::ORIENTATION::ZERO;
+};
+
 class DrawableSketch{
 public:
     DrawableSketch()
@@ -29,7 +34,7 @@ public:
     void DrawSketch(QPainter* painter);
 
 private:
-    std::vector<QPolygonF> sketch_;
+    std::vector<DrawableLayer> sketch_;
     qreal width_;
     qreal height_;
     QPointF origin_;
@@ -56,7 +61,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    DxfHandler handler_;
+    dxf::DxfHandler handler_;
     sketch::Sketch sketch_;
     DrawableSketch drawable_sketch_;
 

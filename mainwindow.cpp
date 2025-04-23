@@ -17,10 +17,13 @@ void DrawableSketch::CreateSketch(sketch::Sketch &sketch, QPoint origin)
 
     for (const auto& layer : sketch.GetSketchLayers()){
         for (const auto& ply : layer){
-            auto& polyline = sketch_.emplace_back(QPolygonF{});
-            for (const auto& node : ply){
+            auto& layer = sketch_.emplace_back(DrawableLayer{});
+
+            layer.orientation_ = ply.orientation_;
+
+            for (const auto& node : ply.nodes_){
                 //QPointF point {node.point_.x + origin_.x(), height_ - node.point_.y + origin_.y()};
-                polyline.emplace_back(QPointF{node.point_.x * 3 + origin_.x(),
+                layer.polyline_.emplace_back(QPointF{node.point_.x * 3 + origin_.x(),
                                               (height_ - node.point_.y * 3) + origin_.y() - height_ });
             }
         }
@@ -30,8 +33,8 @@ void DrawableSketch::CreateSketch(sketch::Sketch &sketch, QPoint origin)
 void DrawableSketch::SetNewOrigin(QPoint new_origin){
     int dy = new_origin.y() - origin_.y();
 
-    for (auto& polyline : sketch_){
-        for(auto& point : polyline){
+    for (auto& layer : sketch_){
+        for(auto& point : layer.polyline_){
             point.setY(point.y() + dy);
         }
     }
@@ -39,9 +42,39 @@ void DrawableSketch::SetNewOrigin(QPoint new_origin){
 }
 
 void DrawableSketch::DrawSketch(QPainter *painter){
-    for (const auto& polyline : sketch_){
-        painter->drawPolyline(polyline);
+
+    const auto old_pen = painter->pen();
+
+    QPen zero_pen(Qt::white);
+    zero_pen.setStyle(Qt::PenStyle::SolidLine);
+    zero_pen.setWidth(1);
+
+    QPen perp_pen(Qt::white);
+    perp_pen.setStyle(Qt::PenStyle::DashLine);
+    perp_pen.setWidth(1);
+
+    QPen other_pen(Qt::white);
+    other_pen.setStyle(Qt::PenStyle::DashDotLine);
+    other_pen.setWidth(1);
+
+    for (const auto& layer : sketch_){
+
+        switch (layer.orientation_) {
+        case domain::ORIENTATION::ZERO:
+            painter->setPen(zero_pen);
+            break;
+        case domain::ORIENTATION::PERPENDICULAR:
+            painter->setPen(perp_pen);
+            break;
+        default:
+            painter->setPen(other_pen);
+            break;
+        }
+
+        painter->drawPolyline(layer.polyline_);
     }
+
+    painter->setPen(old_pen);
 }
 
 MainWindow::MainWindow(QWidget *parent)

@@ -35,7 +35,18 @@ namespace domain {
 
     using Polyline = std::vector<Point>;
 
-    using Raw_sketch = std::list<Polyline>;
+    enum class ORIENTATION{
+        ZERO,                // 0
+        PERPENDICULAR,       // 90
+        OTHER                // +-45 и другие
+    };
+
+    struct Raw_layer{
+        Polyline polyline_;
+        ORIENTATION orientation_ = ORIENTATION::ZERO;
+    };
+
+    using Raw_sketch = std::list<Raw_layer>;
 
     struct Polygon {
         Polygon() = default;

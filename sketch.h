@@ -17,7 +17,13 @@ namespace sketch {
         Node* bottom_node_ = nullptr;
     };
 
-    using Ply = std::vector<Node>;
+    //using Ply = std::vector<Node>;
+
+    struct Ply{
+        std::vector<Node> nodes_;
+        domain::ORIENTATION orientation_ = domain::ORIENTATION::ZERO;
+    };
+
     using Layer = std::vector<Ply>;
 
     /*

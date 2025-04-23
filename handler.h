@@ -3,6 +3,8 @@
 #include "common.h"
 #include "dx_iface.h"
 
+namespace dxf{
+
 class DxfHandler {
 public:
     DxfHandler() = default;
@@ -16,3 +18,5 @@ private:
 	dx_data input_data_;
 	dx_data output_data_;
 };
+
+} // namespace dxf

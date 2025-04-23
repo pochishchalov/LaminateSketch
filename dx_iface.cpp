@@ -5,6 +5,7 @@
 #include "libdwgr.h"
 #include "libdxfrw.h"
 
+namespace dxf{
 
 bool dx_iface::fileImport(const std::string& fileI, dx_data *fData){
     unsigned int found = fileI.find_last_of(".");
@@ -104,3 +105,5 @@ void dx_iface::writeEntity(DRW_Entity* e){
         break;
     }
 }
+
+} // namespace dxf

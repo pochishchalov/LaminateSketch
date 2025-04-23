@@ -11,9 +11,12 @@ namespace sketch {
 
         for (const auto& layer : layers_) {
             for (const auto& ply : layer) {
-                auto& new_polyline = result.emplace_back(Polyline{});
-                for (const auto& point : ply) {
-                    new_polyline.emplace_back(point.point_);
+                auto& new_layer = result.emplace_back(Raw_layer{});
+
+                new_layer.orientation_ = ply.orientation_;
+
+                for (const auto& point : ply.nodes_) {
+                    new_layer.polyline_.emplace_back(point.point_);
                 }
             }
         }
@@ -44,12 +47,12 @@ namespace domain {
 
         // Проверка пересечения остальных линий эскиза с линиями соединяющими
         // начальные и конечные точки 'input' и 'offset'
-        for (const auto& polyline : raw_sketch) {
-            if (input == polyline) {
+        for (const auto& layer : raw_sketch) {
+            if (input == layer.polyline_) {
                 continue;  // Пропускаем проверяемую линию
             }
-            if (IsLineIntersectsPolyline(*input.begin(), *offset.begin(), polyline)
-                || IsLineIntersectsPolyline(input.back(), offset.back(), polyline))
+            if (IsLineIntersectsPolyline(*input.begin(), *offset.begin(), layer.polyline_)
+                || IsLineIntersectsPolyline(input.back(), offset.back(), layer.polyline_))
             {
                 return false;
             }
@@ -63,11 +66,11 @@ namespace domain {
         polygon.AddPolyline(input);
         polygon.AddPolyline(std::move(offset));
 
-        for (const auto& polyline : raw_sketch) {
-            if (input == polyline) {
+        for (const auto& layer : raw_sketch) {
+            if (input == layer.polyline_) {
                 continue;  // Пропускаем проверяемую линию
             }
-            if (IsPolylinePointInPolygon(polyline, polygon))
+            if (IsPolylinePointInPolygon(layer.polyline_, polygon))
             {
                 return false;
             }
@@ -93,8 +96,8 @@ namespace domain {
         };
 
 
-        for (const auto& polyline : raw_sketch) {
-            for (const auto point : polyline) {
+        for (const auto& layer : raw_sketch) {
+            for (const auto point : layer.polyline_) {
                 result.left = std::min(result.left, point.x);
                 result.bottom = std::min(result.bottom, point.y);
                 result.right = std::max(result.right, point.x);
@@ -109,8 +112,8 @@ namespace domain {
     std::pair<float, float> MoveRawSketchToZeroAndGetDimensions(Raw_sketch& raw_sketch) {
         const auto borders = GetBorders(raw_sketch);
 
-        for (auto& polyline : raw_sketch) {
-            for (auto& point : polyline) {
+        for (auto& layer : raw_sketch) {
+            for (auto& point : layer.polyline_) {
                 point.x -= borders.left;
                 point.y -= borders.bottom;
             }
@@ -121,12 +124,12 @@ namespace domain {
 
     // Оптимизирует линии эскиза так, чтобы точки линии шли слева направо
     void StartPointOptimization(Raw_sketch& raw_sketch) {
-        for (auto& polyline : raw_sketch) {
-            const float first_point_x = polyline.begin()->x;
-            const float last_point_x = polyline.back().x;
+        for (auto& layer : raw_sketch) {
+            const float first_point_x = layer.polyline_.begin()->x;
+            const float last_point_x = layer.polyline_.back().x;
 
             if (first_point_x > last_point_x) {
-                std::reverse(polyline.begin(), polyline.end());
+                std::reverse(layer.polyline_.begin(), layer.polyline_.end());
             }
         }
     }
@@ -137,7 +140,7 @@ namespace domain {
 
         for (auto it = raw_sketch.begin(); it != raw_sketch.end(); ++it) {
 
-            if (IsUpperPolyline(*it, raw_sketch)) {
+            if (IsUpperPolyline(it->polyline_, raw_sketch)) {
                 result.push_back(it);
             }
         }
@@ -150,7 +153,7 @@ namespace domain {
 
         std::sort(upper_plies.begin(), upper_plies.end(),         // Сортируем полученные верхние сегменты
             [](const auto& lhs, const auto& rhs) {
-                return lhs->begin()->x < rhs->begin()->x;
+                return lhs->polyline_.begin()->x < rhs->polyline_.begin()->x;
             }
         );
 
@@ -160,17 +163,27 @@ namespace domain {
         if (layers.empty()) {
             for (const auto& ply : upper_plies) {
                 auto& new_ply = new_layer.emplace_back(sketch::Ply{});
-                new_ply.reserve(ply->size());
+                new_ply.nodes_.reserve(ply->polyline_.size());
+
+                new_ply.orientation_ = ply->orientation_;
+
+                for (size_t i = 0; i < ply->polyline_.size(); ++i)
+                {
+                    new_ply.nodes_.emplace_back(sketch::Node(*(ply->polyline_.begin() + i)));
+                }
+
                 }
             }
         else {
             for (const auto& ply : upper_plies) {                        // В дальнейшем узлы верхних сегментов
                 auto& new_ply = new_layer.emplace_back(sketch::Ply{});   // должны проецироваться на нижние сегменты
-                new_ply.reserve(ply->size() * 2);
+                new_ply.nodes_.reserve(ply->polyline_.size() * 2);
 
-                for (size_t i = 0; i < ply->size(); ++i)
+                new_ply.orientation_ = ply->orientation_;
+
+                for (size_t i = 0; i < ply->polyline_.size(); ++i)
                 {
-                    new_ply.emplace_back(sketch::Node(*(ply->begin() + i)));
+                    new_ply.nodes_.emplace_back(sketch::Node(*(ply->polyline_.begin() + i)));
                 }
             }
         }

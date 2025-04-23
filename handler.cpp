@@ -1,5 +1,7 @@
 #include "handler.h"
 
+namespace dxf{
+
 domain::Raw_sketch ConvertDataToRawSketch(const dx_data& data) {
     domain::Raw_sketch result;
 
@@ -9,9 +11,21 @@ domain::Raw_sketch ConvertDataToRawSketch(const dx_data& data) {
         case DRW::ETYPE::POLYLINE:
         {
             auto polyline = static_cast<DRW_Polyline*>(entity);
-            auto& new_polyline = result.emplace_back(domain::Polyline{});
+            auto& new_layer = result.emplace_back(domain::Raw_layer{});
+
+            std::cout << polyline->colorName << std::endl;
+
+            switch (polyline->color) {
+            case 2: new_layer.orientation_ = domain::ORIENTATION::PERPENDICULAR;
+                break;
+            case 5: new_layer.orientation_ = domain::ORIENTATION::ZERO;
+                break;
+            default: new_layer.orientation_ = domain::ORIENTATION::OTHER;
+                break;
+            }
+
             for (const auto& vertex : polyline->vertlist) {
-                new_polyline.emplace_back(domain::Point(
+                new_layer.polyline_.emplace_back(domain::Point(
                     static_cast<float>(vertex->basePoint.x),
                     static_cast<float>(vertex->basePoint.y))
                 );
@@ -31,10 +45,10 @@ void ConvertRawSketchToData(const domain::Raw_sketch& sketch, dx_data& data) {
     layer->name = "SketchLayer";
     layer->color = 1; // Красный цвет
 
-    for (const auto& polyline : sketch) {
+    for (const auto& layer : sketch) {
         DRW_LWPolyline* new_polyline = new DRW_LWPolyline;
         new_polyline->layer = "SketchLayer";
-        for (const auto& point : polyline) {
+        for (const auto& point : layer.polyline_) {
             new_polyline->addVertex(DRW_Vertex2D(point.x, point.y, 0.));
         }
         data.mBlock->ent.push_back(new_polyline);
@@ -59,3 +73,5 @@ domain::Raw_sketch DxfHandler::GetRawSketchFromData() const {
 void DxfHandler::PutRawSketchToData(const domain::Raw_sketch raw_sketch) {
     ConvertRawSketchToData(raw_sketch, output_data_);
 }
+
+} // namespace dxf
