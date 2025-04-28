@@ -21,4 +21,3 @@
 *- iconv*    
 
 ! - В `CMakeList.txt` необходимо указать путь к `iconv` (Например: `C:/Dev/msys64/mingw64`).
->>>>>>> f4ad6af3f16c64b2515199bf4f1c588c042e6332
