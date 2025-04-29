@@ -5,75 +5,71 @@
 #include <QFileDialog>
 #include <QString>
 
-inline QPoint GetOrigin(int height){
-    return QPoint{60, height - 150};
-}
-
-void DrawableSketch::CreateSketch(sketch::Sketch &sketch, QPoint origin)
+void DrawableSketch::CreateSketch(sketch::Sketch &sketch, QRect window)
 {
-    width_ = sketch.Width() * 3;
-    height_ = sketch.Height() * 3;
-    origin_ = {origin.x() + 30., origin.y() - 30.};
+    width_ = sketch.Width() * settings_.scale;
+    height_ = sketch.Height() * settings_.scale;
+    SetOrigin(window);
 
     for (const auto& layer : sketch.GetSketchLayers()){
         for (const auto& ply : layer){
             auto& layer = sketch_.emplace_back(DrawableLayer{});
 
-            layer.orientation_ = ply.orientation_;
+            // Устанавливаем стиль линии у сегмента в зависимости от направления укладки
+            switch (ply.orientation_) {
+            case domain::ORIENTATION::ZERO:
+                layer.style_ = Qt::PenStyle::SolidLine;
+                break;
+            case domain::ORIENTATION::PERPENDICULAR:
+                layer.style_ = Qt::PenStyle::DashLine;
+                break;
+            default:
+                layer.style_ = Qt::PenStyle::DashDotLine;
+                break;
+            }
 
             for (const auto& node : ply.nodes_){
-                //QPointF point {node.point_.x + origin_.x(), height_ - node.point_.y + origin_.y()};
-                layer.polyline_.emplace_back(QPointF{node.point_.x * 3 + origin_.x(),
-                                              (height_ - node.point_.y * 3) + origin_.y() - height_ });
+                layer.polyline_.emplace_back(QPointF{node.point_.x * settings_.scale + origin_.x(),
+                                              (height_ - node.point_.y * settings_.scale) + origin_.y() - height_ });
             }
         }
     }
 }
 
-void DrawableSketch::SetNewOrigin(QPoint new_origin){
-    int dy = new_origin.y() - origin_.y();
+void DrawableSketch::SetOrigin(QRect window){
 
+    // Эскиз всегда находится в середине окна
+    QPoint new_origin = {static_cast<int>((window.width() - GetWidth()) / 2),
+                        static_cast<int>(window.height() - MainWindow::PANEL_SIZE
+                                          - (window.height() - MainWindow::PANEL_SIZE
+                                          - GetHeight()) / 2)};
+
+    // Смещаем эскиз
+    int dy = new_origin.y() - origin_.y();
+    int dx = new_origin.x() - origin_.x();
     for (auto& layer : sketch_){
         for(auto& point : layer.polyline_){
             point.setY(point.y() + dy);
+            point.setX(point.x() + dx);
         }
     }
+
+    // Присваиваем новое начало эскиза
     origin_ = new_origin;
 }
 
 void DrawableSketch::DrawSketch(QPainter *painter){
-
+    // Сохраняем предыдущую "ручку"
     const auto old_pen = painter->pen();
 
-    QPen zero_pen(Qt::white);
-    zero_pen.setStyle(Qt::PenStyle::SolidLine);
-    zero_pen.setWidth(1);
-
-    QPen perp_pen(Qt::white);
-    perp_pen.setStyle(Qt::PenStyle::DashLine);
-    perp_pen.setWidth(1);
-
-    QPen other_pen(Qt::white);
-    other_pen.setStyle(Qt::PenStyle::DashDotLine);
-    other_pen.setWidth(1);
+    const QBrush brush(settings_.color);
 
     for (const auto& layer : sketch_){
-
-        switch (layer.orientation_) {
-        case domain::ORIENTATION::ZERO:
-            painter->setPen(zero_pen);
-            break;
-        case domain::ORIENTATION::PERPENDICULAR:
-            painter->setPen(perp_pen);
-            break;
-        default:
-            painter->setPen(other_pen);
-            break;
-        }
-
+        painter->setPen(QPen{brush, settings_.lines_width, layer.style_}); // Для отрисовывки каждого слоя со своими настройками
         painter->drawPolyline(layer.polyline_);
     }
 
+    // Устанавливаем предыдущую "ручку" назад
     painter->setPen(old_pen);
 }
 
@@ -103,8 +99,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->cb_format_selection->setMouseTracking(true);
     ui->cb_format_selection->installEventFilter(this);
-
-    origin_ = GetOrigin(height());
 }
 
 MainWindow::~MainWindow()
@@ -131,44 +125,83 @@ void DrawBackground(QPainter* painter, QRect window){
     painter->drawPixmap(window, background, drawing_area);
 }
 
-void DrawAxis(QPainter* painter, QPoint origin, int width){
-    const int offset_y = 30;
-    const int offset_x = 60;
+void DrawAxis(QPainter* painter, QPoint origin, QRect window, QRect sketch){
+    const int offset_y = MainWindow::PANEL_SIZE + MainWindow::PIX_IN_CM * 2;
+    const int offset_x = MainWindow::PIX_IN_CM * 2;
+
+    const auto old_pen = painter->pen();
+
+    QPen pen(Qt::white);
+    pen.setWidth(2.);
+
+    painter->setPen(pen);
+
+
+    int x = (origin.x() - offset_x < offset_x)? origin.x() - offset_x
+                                              : offset_x;
+    int y = (window.height() - origin.y() - offset_y < MainWindow::PIX_IN_CM)
+            ? origin.y() + MainWindow::PIX_IN_CM : window.height() - offset_y;
 
     // Рисуем ось Y
-    painter->drawLine(QPoint{origin.x(), offset_y}, origin);
+    painter->drawLine(QPoint{x, origin.y()},
+                      QPoint{x, origin.y() - sketch.height()});
 
     // Рисуем ось X
-    painter->drawLine(origin, QPoint{width - offset_x, origin.y()});
+    painter->drawLine(QPoint{origin.x(), y},
+                      QPoint{origin.x() + sketch.width(), y});
 
-    int step = 15;
-    bool is_short_line = true;
-    for(int y = origin.y() - step, distance = -5; y >= offset_y; y -= step, distance += 5){
-        painter->drawLine(QPoint{(is_short_line) ? 52 : 45, y},
-                          QPoint{origin.x(), y});
-        if (is_short_line){
-            is_short_line = false;
+    // Возвращает число санитиметровой шкалы и смещение для цифры
+    auto number_and_offset = [](int d){
+        int number = d / MainWindow::PIX_IN_CM;
+        return std::make_pair(number, (number < 10) ? 3 : 7);
+    };
+
+    int strokes_step = MainWindow::PIX_IN_CM / 2;
+
+    int long_stroke_length = MainWindow::PIX_IN_CM / 2;
+    int short_stroke_length = long_stroke_length / 2;
+
+    bool is_short_stroke = false;
+
+    for(int dy = 0; dy < sketch.height(); dy += strokes_step){
+        painter->drawLine(QPoint{(is_short_stroke)
+                                ? x - short_stroke_length
+                                : x - long_stroke_length,
+                                origin.y() - dy},
+                          QPoint{x, origin.y() - dy});
+        if (is_short_stroke){
+            is_short_stroke = false;
         }
         else {
-            painter->drawText(QPoint{25, y + 5}, QString::number(distance));
-            is_short_line = true;
+            auto [number, offset] = number_and_offset(dy);
+            painter->drawText(QPoint{x - MainWindow::PIX_IN_CM,
+                                     origin.y() - dy + offset},
+                              QString::number(number));
+            is_short_stroke = true;
         }
     }
 
-    const int right_border = width - offset_x;
-    is_short_line = true;
-    for(int x = offset_x + step, distance = -5; x < right_border; x += step, distance += 5){
-        painter->drawLine(QPoint{x, (is_short_line) ? origin.y() + 8
-                                                    : origin.y() + 15},
-                          QPoint{x, origin.y()});
-        if (is_short_line){
-            is_short_line = false;
+    is_short_stroke = false;
+
+    for(int dx = 0; dx < sketch.width(); dx += strokes_step){
+        painter->drawLine(QPoint{origin.x() + dx,
+                                  (is_short_stroke)
+                                  ? y + short_stroke_length
+                                  : y + long_stroke_length,},
+                          QPoint{origin.x() + dx, y});
+        if (is_short_stroke){
+            is_short_stroke = false;
         }
         else {
-            painter->drawText(QPoint{x - 10, origin.y() + 30}, QString::number(distance));
-            is_short_line = true;
+            auto [number, offset] = number_and_offset(dx);
+            painter->drawText(QPoint{origin.x() + dx - offset,
+                                     y + MainWindow::PIX_IN_CM},
+                              QString::number(number));
+            is_short_stroke = true;
         }
     }
+
+    painter->setPen(old_pen);
 }
 
 void MainWindow::paintEvent(QPaintEvent *event) {
@@ -176,20 +209,12 @@ void MainWindow::paintEvent(QPaintEvent *event) {
 
     DrawBackground(&painter, rect());
 
-    QPen pen(Qt::white);
-    pen.setWidth(2);
-
-    painter.setPen(pen);
-
-    origin_ = GetOrigin(height());
-
-    DrawAxis(&painter, origin_, width());
-
-    pen.setWidth(1);
-    painter.setPen(pen);
-
     if (!drawable_sketch_.IsEmpty()){
-        drawable_sketch_.SetNewOrigin({origin_.x() + 30, origin_.y() - 30});
+        drawable_sketch_.SetOrigin(rect());
+        DrawAxis(&painter, drawable_sketch_.GetOrigin(), rect(),
+                 QRect{0, 0, drawable_sketch_.GetWidth(),
+                  drawable_sketch_.GetHeight() }
+                 );
         drawable_sketch_.DrawSketch(&painter);
     }
 
@@ -256,7 +281,7 @@ void MainWindow::on_btn_open_file_clicked()
     if (success){
         // Наполняем эскиз
         sketch_.FillSketch(handler_.GetRawSketchFromData());
-        drawable_sketch_.CreateSketch(sketch_, origin_);
+        drawable_sketch_.CreateSketch(sketch_, rect());
 
         ui->lbl_message_text->setText("The file was successfully uploaded");
     }

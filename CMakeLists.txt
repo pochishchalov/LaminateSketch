@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(laminate_sketch VERSION 0.1 LANGUAGES CXX)
+project(LaminateSketch VERSION 0.1 LANGUAGES CXX)
 
 # Устанавливаем политики для новых версий CMake
 cmake_policy(SET CMP0167 NEW)
@@ -59,7 +59,7 @@ set(PROJECT_SOURCES
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(laminate_sketch
+    qt_add_executable(LaminateSketch
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         common.h sketch.h
@@ -69,24 +69,24 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         resources.qrc
     )
 # Define target properties for Android with Qt 6 as:
-#    set_property(TARGET laminate_sketch APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
+#    set_property(TARGET LaminateSketch APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
 #                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
 # For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
 else()
     if(ANDROID)
-        add_library(laminate_sketch SHARED
+        add_library(LaminateSketch SHARED
             ${PROJECT_SOURCES}
         )
 # Define properties for Android with Qt 5 after find_package() calls as:
 #    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
     else()
-        add_executable(laminate_sketch
+        add_executable(LaminateSketch
             ${PROJECT_SOURCES}
         )
     endif()
 endif()
 
-target_link_libraries(laminate_sketch PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries(LaminateSketch PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
 # Директории с заголовками
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -115,9 +115,9 @@ endif()
 # If you are developing for iOS or macOS you should consider setting an
 # explicit, fixed bundle identifier manually though.
 if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.laminate_sketch)
+  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.LaminateSketch)
 endif()
-set_target_properties(laminate_sketch PROPERTIES
+set_target_properties(LaminateSketch PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
@@ -126,14 +126,14 @@ set_target_properties(laminate_sketch PROPERTIES
 )
 
 include(GNUInstallDirs)
-install(TARGETS laminate_sketch
+install(TARGETS LaminateSketch
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(laminate_sketch)
+    qt_finalize_executable(LaminateSketch)
 endif()
 
 # Платформозависимые настройки иконки
@@ -145,13 +145,13 @@ if (WIN32)
         COPYONLY
     )
     set(RC_FILE ${CMAKE_CURRENT_BINARY_DIR}/app_icon.ico)
-    target_sources(laminate_sketch PRIVATE ${RC_FILE})
+    target_sources(LaminateSketch PRIVATE ${RC_FILE})
 
     # Генерируем .rc-файл
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/icon.rc
         "IDI_ICON1 ICON DISCARDABLE \"app_icon.ico\"\n"
     )
-    target_sources(laminate_sketch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/icon.rc)
+    target_sources(LaminateSketch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/icon.rc)
 
 elseif (APPLE)
     # Для macOS: указываем ICNS-файл
@@ -161,8 +161,8 @@ elseif (APPLE)
         PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
-    target_sources(laminate_sketchp PRIVATE icons/app_icon.icns)
-    set_target_properties(laminate_sketch PROPERTIES
+    target_sources(LaminateSketchp PRIVATE icons/app_icon.icns)
+    set_target_properties(LaminateSketch PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_ICON ${MACOSX_BUNDLE_ICON_FILE}
     )
