@@ -6,8 +6,6 @@
 #include "libdxfrw.h"
 #include "dx_data.h"
 
-namespace dxf{
-
 class dx_iface : public DRW_Interface {
 public:
     dx_iface(){ dxfW = nullptr;}
@@ -215,7 +213,5 @@ public:
     dx_data* cData; // class to store or read data
     dx_ifaceBlock* currentBlock;
 };
-
-} // namespace dxf
 
 #endif // DX_IFACE_H

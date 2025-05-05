@@ -3,8 +3,6 @@
 #define DX_DATA_H
 #include "libdxfrw.h"
 
-namespace dxf{
-
 //class to store image data and path from DRW_ImageDef
 class dx_ifaceImg : public DRW_Image {
 public:
@@ -57,6 +55,6 @@ public:
 
 };
 
-} // namespace dxf
+
 
 #endif // DX_DATA_H

@@ -64,9 +64,11 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         common.h sketch.h
         common.cpp sketch.cpp
+        ls_data.h
         dx_data.h dx_iface.h handler.h
         dx_iface.cpp handler.cpp
         resources.qrc
+
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET LaminateSketch APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

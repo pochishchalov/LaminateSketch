@@ -18,40 +18,27 @@ struct DrawableLayer{
     Qt::PenStyle style_ = Qt::PenStyle::NoPen;
 };
 
-struct DrawableSketchSettings{
-    qreal lines_width = 1.;
-    qreal scale = 3.;
-    QColor color = Qt::white;
-};
-
 class DrawableSketch{
 public:
     DrawableSketch()
-        :width_(0.)
-        ,height_(0.)
+        :width_(0)
+        ,height_(0)
     {
     }
 
-    void CreateSketch(sketch::Sketch& sketch, QRect window);
+    void CreateSketch(ls::Sketch& sketch, QRect window);
     void SetOrigin(QRect window);
     QPoint GetOrigin() const { return origin_; }
-    qreal GetWidth() const { return width_; }
-    qreal GetHeight() const { return height_; }
+    int GetWidth() const { return width_; }
+    int GetHeight() const { return height_; }
     bool IsEmpty() { return sketch_.empty(); }
     void DrawSketch(QPainter* painter);
 
 private:
     std::vector<DrawableLayer> sketch_;
-    DrawableSketchSettings settings_;
-    qreal width_;
-    qreal height_;
+    int width_;
+    int height_;
     QPoint origin_;
-};
-
-struct WindowSettings {
-    qreal axis_width = 2.;
-    qreal scale = 3.;
-    QColor color = Qt::white;
 };
 
 class MainWindow : public QMainWindow
@@ -79,8 +66,7 @@ private:
     Ui::MainWindow *ui;
 
     dxf::DxfHandler handler_;
-    sketch::Sketch sketch_;
+    ls::Sketch sketch_;
     DrawableSketch drawable_sketch_;
-    WindowSettings settings_;
 };
 #endif // MAINWINDOW_H
