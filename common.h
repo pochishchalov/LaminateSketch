@@ -166,6 +166,14 @@ inline auto SlopeComponents(const Point& p1, const Point& p2) noexcept {
     return std::make_pair(p2.y - p1.y, p2.x - p1.x); // (dy, dx)
 }
 
+// Проверка коллинеарности трех точек через векторное произведение
+inline bool IsCollinear(const Point& a, const Point& b, const Point& c,
+                        double abs_epsilon = 1e-12,
+                        double rel_epsilon = 1e-8) {
+    const double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    return ApproximatelyEqual(area, 0.0, abs_epsilon, rel_epsilon);
+}
+
 // Находит точку пересечения двух отрезков
 std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2,
     const Point& p3, const Point& p4);

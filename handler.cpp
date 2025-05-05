@@ -68,7 +68,7 @@ domain::RawData ConvertDataToRawSketch(const dx_data& data) {
         }
     }
 
-    return domain::RemoveExtraDots(result, 1e-5, 1e-3);
+    return domain::RemoveExtraDots(result, 1e-4);
 }
 
 void ConvertRawSketchToData(const domain::RawData& sketch, dx_data& data) {

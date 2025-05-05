@@ -252,30 +252,30 @@ double DistanceBetweenPoints(const Point& p1, const Point& p2) {
 
 RawPolyline RemoveExtraDots(const RawPolyline& input, double abs_epsilon, double rel_epsilon) {
     RawPolyline result;
+    if (input.polyline.empty()) return result;
 
-    if (input.polyline.size() < 3) {
-        return {};
-    }
-    result.polyline.reserve(input.polyline.size());
     result.ori = input.ori;
+    result.polyline.reserve(input.polyline.size());
 
-    result.polyline.emplace_back(input.polyline[0]);
+    // Всегда добавляем первую точку
+    result.polyline.push_back(input.polyline[0]);
+    size_t prev = 0;
 
-    for (size_t prev = 0, curr = 1, next = 2; next < input.polyline.size(); ++next, ++curr) {
-        auto first_line_slope = SlopeComponents(input.polyline[prev], input.polyline[curr]);
-        auto second_line_slope = SlopeComponents(input.polyline[curr], input.polyline[next]);
+    for (size_t next = 1; next < input.polyline.size(); ++next) {
+        const auto& p_prev = result.polyline.back();
+        const auto& p_curr = input.polyline[next];
 
-        if (ApproximatelyEqual(first_line_slope.first, second_line_slope.first, abs_epsilon, rel_epsilon)
-            && ApproximatelyEqual(first_line_slope.second, second_line_slope.second, abs_epsilon, rel_epsilon)) {
-            continue;
+        // Проверяем коллинеарность текущего отрезка с предыдущим
+        if (result.polyline.size() >= 2) {
+            const auto& p_prev_prev = result.polyline[result.polyline.size() - 2];
+            if (IsCollinear(p_prev_prev, p_prev, p_curr, abs_epsilon, rel_epsilon)) {
+                // Удаляем предыдущую точку, так как она коллинеарна
+                result.polyline.pop_back();
+            }
         }
-        else {
-            result.polyline.emplace_back(input.polyline[curr]);
-            prev = curr;
-        }
+        result.polyline.push_back(p_curr);
     }
-        
-    result.polyline.emplace_back(input.polyline.back());
+
     return result;
 }
 
