@@ -44,3 +44,9 @@ private:
 };
 
 }  // namespace ls
+
+namespace domain {
+
+bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch);
+
+} //namespace domain

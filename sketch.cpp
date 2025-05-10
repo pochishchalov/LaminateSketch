@@ -112,61 +112,206 @@ std::vector<RawData::iterator>GetUpperPlies(RawData& raw_sketch) {
     return result;
 }
 
-void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
-    std::list<std::pair<ls::NodePos, bool>>& unused_nodes) {
+// Общая функция для проверки и установки соединения
+// Возвращает результат соединения с левой 'first' и правой 'second' точкой
+std::pair<bool, bool> TryConnectIntersection(const std::optional<Point>& intersect,
+    ls::Node& first, ls::Node& second,
+    ls::Node& connectable_node) {
+    if (!intersect) {
+        return { false, false };
+    } 
 
-    std::sort(upper_plies.begin(), upper_plies.end(),         // Сортируем полученные верхние сегменты слева направо
-        [](const auto& lhs, const auto& rhs) {
-            return lhs->polyline.begin()->x < rhs->polyline.begin()->x; }
-    );
+    bool is_first = ApproximatelyEqual(*intersect, first.point, 1e-4);
+    bool is_second = ApproximatelyEqual(*intersect, second.point, 1e-4);
+    if (!is_first && !is_second) {
+        return { false, false };
+    } 
 
-    unsigned short layer_pos = data.LayersCount();              // Объявляем до создания слоя чтобы не вычитать единицу
+    ls::Node& target = is_first ? first : second;
+    if (!target.top_pos && !connectable_node.bottom_pos) {
+        target.top_pos = connectable_node.pos;
+        connectable_node.bottom_pos = target.pos;
+        return { is_first, is_second };
+    }
+    return { false, false };
+}
 
-    auto& new_layer = data.AddLayer();   // Добавляем новый слой
-    new_layer.reserve(upper_plies.size());                 // Резервируем место для сегметов слоя
+// Соединяет неиспользованные точки с сегментом граниченным узлами first и last
+void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
+    std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
+{
+    for (auto& [node_pos, is_tied] : unused_nodes) {
 
+        ls::Node& connectable = data.GetNode(node_pos);
 
-    for (auto& ply : upper_plies) {
+        if (connectable.bottom_pos.has_value()) {
+            continue;
+        }
+        
+        const bool is_first_node = data.IsFirstNodeInPly(node_pos);
+        const bool is_last_node = data.IsLastNodeInPly(node_pos);
 
-        auto& new_ply = new_layer.AddPly();  // Добавляем новый сегмент
+        std::vector<ls::Node*> neighbors;
+        // Соседний узел слева
+        if (!is_first_node) {
+            neighbors.push_back(&data.GetNode(ls::NodePos{
+            node_pos.layer_pos, node_pos.ply_pos,
+            static_cast<unsigned short>(node_pos.node_pos - 1) }));
+        } 
+        // Соседний узел справа
+        if (!is_last_node) {
+            neighbors.push_back(&data.GetNode(ls::NodePos{
+            node_pos.layer_pos, node_pos.ply_pos,
+            static_cast<unsigned short>(node_pos.node_pos + 1) }));
+        } 
 
-        new_ply.ori = ply->ori;
+        // Обработка биссектрисы
+        if (!is_first_node && !is_last_node) {
 
-        if (layer_pos == 0) {                                 // Если слой первый, то просто преобразуем
-            new_ply.reserve(ply->pointsCount());   // все точки в узлы и добавляем в сегмент
+            std::pair<Point, Point> bisect_line = {
+                СalculateBisector(neighbors[0]->point, connectable.point, neighbors[1]->point, 3.0),
+                СalculateBisector(neighbors[0]->point, connectable.point, neighbors[1]->point, -3.0)
+            };
 
-            for (const auto& point : ply->polyline) {
-                new_ply.AddNode(ls::Node{ point });
+            auto [is_first, is_second] = TryConnectIntersection(
+                FindSegmentsIntersection(first.point, second.point, bisect_line.first, bisect_line.second, 1e-4),
+                first, second, connectable);
+
+            if (is_first || is_second) {
+                is_tied = true;
+                if (is_second) {
+                    return;
+                }
+                continue;
             }
         }
-        else {                                                      // Если слой не первый
-            new_ply.reserve(ply->pointsCount() * 2);                // могут добавится дополнительные узлы
 
-            for (size_t i = 0; i < ply->pointsCount(); ++i) {
-                new_ply.AddNode(ls::Node{ ply->polyline[i] });
-                if (i != 0) {
-                    //TieNodes(new_ply, data, unused_nodes);          // Функция связывания неиспользованных узлов с новыми
+        std::vector<Point> intersections;
+        bool is_complete = false;
+
+        // Обработка перпендикуляров к соседям
+        for (ls::Node* neighbor : neighbors) {
+
+            std::pair<Point, Point> perp_line = {
+                GetPerpendicularPoint(connectable.point, neighbor->point, 3.0),
+                GetPerpendicularPoint(connectable.point, neighbor->point, -3.0)
+            };
+
+            auto intersection = FindSegmentsIntersection(first.point, second.point,
+                perp_line.first, perp_line.second, 1e-4);
+
+            auto [is_first, is_second] = TryConnectIntersection(
+                intersection, first, second, connectable);
+
+            if (is_first || is_second) {
+                is_tied = true;
+                if (is_second) {
+                    return;
+                }
+                is_complete = true;
+                break;
+            }
+            if (intersection.has_value()) {
+                intersections.push_back(intersection.value());
+            }
+        }
+        if (is_complete) {
+            continue;
+        }
+
+        // Создание нового узла при необходимости
+        if (intersections.size() > 0) {
+
+            Point intersection_point = intersections[0];
+            if (intersections.size() == 2) {
+                if (IsParallelLines(first.point, second.point, connectable.point, neighbors[1]->point)) {
+                    intersection_point = intersections[1];
                 }
             }
+            
+            ls::Node& new_node = data.InsertNode(second.pos, ls::Node{ .point = intersection_point, .pos = second.pos });
+            new_node.top_pos.emplace(connectable.pos);
+            connectable.bottom_pos.emplace(new_node.pos);
+            is_tied = true;
         }
     }
+}
+
+void ConnectNodes(ls::Ply& ply, ls::Data& data, std::vector<std::pair<ls::NodePos, bool>>& unused_nodes) {
+    for (auto pos = ply.GetFirstNode().pos; pos <= ply.GetLastNode().pos; ++pos.node_pos) {
+        if (pos.node_pos != 0) {
+            ls::Node& first = data.GetNode(ls::NodePos{ .layer_pos = pos.layer_pos,
+                                                        .ply_pos = pos.ply_pos,
+                                                        .node_pos = static_cast<unsigned short>(pos.node_pos - 1) });
+            ls::Node& second = data.GetNode(pos);
+
+            ConnectLineWithNodes(first, second, data, unused_nodes);
+        }
+    }
+}
+
+void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
+    std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
+{
+    // Сортировка сегментов слева направо
+    std::sort(upper_plies.begin(), upper_plies.end(),
+        [](const auto& lhs, const auto& rhs) {
+            return lhs->polyline.begin()->x < rhs->polyline.begin()->x;
+        });
+
+    const unsigned short layer_pos = data.LayersCount(); // Опережающее присвоение чтобы не вычитать единицу
+    auto& new_layer = data.AddLayer();
+    new_layer.reserve(upper_plies.size());
+
+    const bool is_first_layer = (layer_pos == 0);
+
+    for (auto& ply : upper_plies) {
+        const unsigned short ply_pos = data.GetLayer(layer_pos).PliesCount(); // Опережающее присвоение чтобы не вычитать единицу
+        auto& new_ply = new_layer.AddPly();
         
-    // Очищаем от использованных узлов
-    for (auto iter = unused_nodes.begin(); iter != unused_nodes.end(); ++iter) {
-        if (iter->second == true) {
-            iter = unused_nodes.erase(iter);
+        const auto points_count = ply->PointsCount();
+
+        new_ply.ori = ply->ori;
+        new_ply.reserve(is_first_layer ? points_count : points_count + unused_nodes.size());
+
+        // Добавляем узлы в сегмент
+        for (unsigned short i = 0; i < points_count; ++i) {
+            new_ply.AddNode(ls::Node{
+                .point = ply->GetPoint(i),
+                .pos = {.layer_pos = layer_pos,
+                        .ply_pos = ply_pos,
+                        .node_pos = i}
+                });
+        }
+        // Соединяем узлы нового сегмента с неиспользованными узлами
+        if (!is_first_layer) {
+            ConnectNodes(new_ply, data, unused_nodes);
         }
     }
 
-    // Добавляем позиции всех точек нового слоя в категорию неиспользованных
+    // Очистка от использованных узлов
+    unused_nodes.erase(
+        std::remove_if(unused_nodes.begin(), unused_nodes.end(),
+            [](const auto& p) { return p.second; }),
+        unused_nodes.end()
+    );
+
+    // Узлы нового сегмента добавляются к неиспользованным
+    size_t total_nodes = 0;
+    for (const auto& ply : new_layer) {
+        total_nodes += ply.PointsCount();
+    }
+    unused_nodes.reserve(unused_nodes.size() + total_nodes);
+
     for (unsigned short ply_pos = 0; ply_pos < new_layer.size(); ++ply_pos) {
-        for (unsigned short node_pos = 0; node_pos < new_layer[ply_pos].size(); ++node_pos) {
-            unused_nodes.emplace_back(std::make_pair(ls::NodePos{ .layer_pos = layer_pos,
-                                                       .ply_pos = ply_pos,
-                                                       .node_pos = node_pos }, false));
+        const auto& ply = new_layer[ply_pos];
+        for (unsigned short node_pos = 0; node_pos < ply.size(); ++node_pos) {
+            unused_nodes.emplace_back(
+                ls::NodePos{ layer_pos, ply_pos, node_pos },
+                false
+            );
         }
     }
-        
 }
 
 ls::Data ConvertRawSketch(RawData&& raw_sketch) {
@@ -175,7 +320,7 @@ ls::Data ConvertRawSketch(RawData&& raw_sketch) {
 
     StartPointOptimization(raw_sketch);    // Переворачиваем линии эскиза если они идут справа налево
 
-    std::list<std::pair<ls::NodePos, bool>> unused_nodes;  // Для хранения позиций узлов не связанных с другими
+    std::vector<std::pair<ls::NodePos, bool>> unused_nodes;  // Для хранения позиций узлов не связанных с другими
 
     while (!raw_sketch.empty()) {          // Создаем слои эскиза из линий "сырого" эскиза
 
@@ -200,8 +345,8 @@ void ScaleLayers(ls::Data& layers, double scale)
     for (auto& layer : layers) {
         for (auto& ply : layer) {
             for (auto& node : ply) {
-                node.point_.x *= scale;
-                node.point_.y *= scale;
+                node.point.x *= scale;
+                node.point.y *= scale;
             }
         }
     }
@@ -224,7 +369,7 @@ domain::RawData Sketch::GetRawSketch() const {
             new_layer.ori = ply.ori;
 
             for (const auto& node : ply) {
-                new_layer.polyline.emplace_back(node.point_);
+                new_layer.polyline.emplace_back(node.point);
             }
         }
     }
@@ -238,7 +383,7 @@ bool Sketch::FillSketch(domain::RawData&& raw_sketch) {
 
    width_ = width, height_ = height;
 
-   auto data = ConvertRawSketch(std::move(raw_sketch));
+   auto data = ls::ConvertRawSketch(std::move(raw_sketch));
 
     if (data.IsEmpty()) {
         return false;

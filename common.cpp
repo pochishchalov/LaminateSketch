@@ -2,14 +2,9 @@
 
 namespace domain {
 
-bool IsPerpendicularLines(const Point& p1, const Point& p2, const Point& p3, const Point& p4) {
-    // Вычисляем знаменатель
-    double denominator = (p4.x - p3.x) * (p2.y - p1.y) - (p2.x - p1.x) * (p4.y - p3.y);
-
-    return IsZero(denominator);
-}
-
-std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2, const Point& p3, const Point& p4) {
+std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2, const Point& p3, const Point& p4,
+    double abs_epsilon, double rel_epsilon)
+{
     // Вычисляем знаменатель
     double denominator = (p4.x - p3.x) * (p2.y - p1.y) - (p2.x - p1.x) * (p4.y - p3.y);
 
@@ -23,8 +18,8 @@ std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2, 
     double u = ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) / denominator;
 
     // Проверяем, находятся ли параметры в пределах отрезков
-    if (IsGreaterOrEqual(t, 0.f) && IsLessOrEqual(t, 1.0f)
-        && IsGreaterOrEqual(u, 0.f) && IsLessOrEqual(u, 1.0f))
+    if (IsGreaterOrEqual(t, 0., abs_epsilon, rel_epsilon) && IsLessOrEqual(t, 1.0, abs_epsilon, rel_epsilon)
+        && IsGreaterOrEqual(u, 0., abs_epsilon, rel_epsilon) && IsLessOrEqual(u, 1.0, abs_epsilon, rel_epsilon))
     {
         return Point(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y));
     }
@@ -80,7 +75,7 @@ bool IsPointInPolygon(const Point& test, const Polygon& polygon) {
         }
 
         // Проверяем, лежит ли test.x между p1.x и p2.x
-        if (std::islessequal(test.x, std::min(p1.x, p2.x)) ||
+        if (IsLessOrEqual(test.x, std::min(p1.x, p2.x)) ||
             (test.x > std::max(p1.x, p2.x)))
         {
             continue;
@@ -286,6 +281,47 @@ RawData RemoveExtraDots(const RawData& data, double abs_epsilon, double rel_epsi
         result.emplace_back(RemoveExtraDots(polyline, abs_epsilon, rel_epsilon));
     }
     return result;
+}
+
+Point СalculateBisector(const Point& a, const Point& b, const Point& c, double length) {
+    Point bisector_end = b; // По умолчанию возвращаем саму точку b
+
+    // Векторы BA и BC
+    double ba_x = a.x - b.x;
+    double ba_y = a.y - b.y;
+    double bc_x = c.x - b.x;
+    double bc_y = c.y - b.y;
+
+    // Длины векторов
+    double len_ba = sqrt(ba_x * ba_x + ba_y * ba_y);
+    double len_bc = sqrt(bc_x * bc_x + bc_y * bc_y);
+
+    // Проверка на нулевую длину векторов
+    if (IsZero(len_ba) || IsZero(len_bc)) {
+        return bisector_end;
+    }
+
+    // Нормализация векторов
+    double norm_ba_x = ba_x / len_ba;
+    double norm_ba_y = ba_y / len_ba;
+    double norm_bc_x = bc_x / len_bc;
+    double norm_bc_y = bc_y / len_bc;
+
+    // Направление биссектрисы
+    double dir_x = norm_ba_x + norm_bc_x;
+    double dir_y = norm_ba_y + norm_bc_y;
+
+    // Нормализация направления
+    double dir_length = sqrt(dir_x * dir_x + dir_y * dir_y);
+    if (dir_length == 0) {
+        return bisector_end;
+    }
+
+    // Вычисление конечной точки
+    bisector_end.x = b.x + (dir_x / dir_length) * length;
+    bisector_end.y = b.y + (dir_y / dir_length) * length;
+
+    return bisector_end;
 }
 
 } // namespace domain

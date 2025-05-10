@@ -15,24 +15,13 @@ struct NodePos {
     unsigned short node_pos = 0;
 
     auto operator<=>(const NodePos&) const = default;
-
-    NodePos GetPrevPos() const {
-        return NodePos{ .layer_pos = layer_pos,
-                       .ply_pos = ply_pos,
-                       .node_pos = static_cast<unsigned short>(node_pos - 1) };
-    }
-
-    NodePos GetNextPos() const {
-        return NodePos{ .layer_pos = layer_pos,
-                       .ply_pos = ply_pos,
-                       .node_pos = static_cast<unsigned short>(node_pos + 1) };
-    }
 };
 
 struct Node {
-    domain::Point point_;
-    std::optional<NodePos> top_pos_;
-    std::optional<NodePos> bottom_pos_;
+    domain::Point point;
+    NodePos pos;
+    std::optional<NodePos> top_pos;
+    std::optional<NodePos> bottom_pos; 
 };
 
 template <typename T>
@@ -70,10 +59,32 @@ protected:
 struct Ply : public VectorWrapper<Node> {
     domain::ORI ori = domain::ORI::ZERO;
 
-    // Добавляем методы для работы с нодами
     Node& AddNode(Node&& node) {
         return data_.emplace_back(std::move(node));
     }
+    Node& AddNode(const Node& node) {
+        return data_.emplace_back(node);
+    }
+
+    Node& InsertNode(size_t index, Node&& node) {
+        auto new_node = data_.emplace(data_.begin() + index, std::move(node));
+        for (size_t i = index + 1; i < PointsCount(); ++i) {
+            ++data_[i].pos.node_pos;
+        }
+        return *new_node;
+    }
+
+    Node& GetNode(size_t index) {
+        return data_.at(index);
+    }
+    Node& GetFirstNode() {
+        return *data_.begin();
+    }
+    Node& GetLastNode() {
+        return data_.back();
+    }
+
+    size_t PointsCount() const noexcept { return data_.size(); }
 };
 
 struct Layer : public VectorWrapper<Ply> {
@@ -81,6 +92,12 @@ struct Layer : public VectorWrapper<Ply> {
     Ply& AddPly() {
         return data_.emplace_back(Ply{});
     }
+
+    Ply& GetPly(size_t index) {
+        return data_.at(index);
+    }
+
+    size_t PliesCount() const noexcept { return data_.size(); }
 };
 
 class Data {
@@ -125,12 +142,19 @@ public:
         return layers_.emplace_back(Layer{});
     }
 
-    Layer& GetLayer(size_t idx) {
-        return layers_.at(idx);
+    Layer& GetLayer(size_t index) {
+        return layers_.at(index);
+    }
+
+    Node& InsertNode(NodePos pos, Node&& node) {
+        return GetLayer(pos.layer_pos)
+            .GetPly(pos.ply_pos)
+            .InsertNode(pos.node_pos, std::move(node));
     }
 
     bool IsLastNodeInPly(const NodePos pos) {
-        return static_cast<unsigned short>(layers_[pos.layer_pos][pos.ply_pos].size() - 1)
+        size_t size = GetLayer(pos.layer_pos).GetPly(pos.ply_pos).PointsCount() - 1;
+        return static_cast<unsigned short>(size)
             == pos.node_pos;
     }
 

@@ -31,8 +31,8 @@ void DrawableSketch::CreateSketch(ls::Sketch &sketch, QRect window)
             }
 
             for (const auto& node : ply){
-                layer.polyline_.emplace_back(QPointF{node.point_.x * pix_in_mm + origin_.x(),
-                                              (height_ - node.point_.y * pix_in_mm) + origin_.y() - height_ });
+                layer.polyline_.emplace_back(QPointF{node.point.x * pix_in_mm + origin_.x(),
+                                              (height_ - node.point.y * pix_in_mm) + origin_.y() - height_ });
             }
         }
     }
@@ -141,8 +141,8 @@ void DrawAxis(QPainter* painter, QPoint origin, QRect window, QRect sketch) {
     axis_pen.setWidth(2);
     painter->setPen(axis_pen);
 
-    // Оптимизация вычисления координат
-    const int x_pos = std::max(origin.x() - offset_x, offset_x);
+    // Вычисление координат
+    const int x_pos = std::min(origin.x() - offset_x, offset_x);
     const int y_pos = (window.height() - origin.y() - offset_y < PIX_IN_CM)
                           ? origin.y() + PIX_IN_CM
                           : window.height() - offset_y;

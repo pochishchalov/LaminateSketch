@@ -45,7 +45,8 @@ struct RawPolyline {
     Polyline polyline;
     ORI ori = ORI::ZERO;
 
-    size_t pointsCount() const { return polyline.size(); }
+    size_t PointsCount() const { return polyline.size(); }
+    const Point& GetPoint(size_t index) const { return polyline[index]; }
 };
 
 using RawData = std::list<RawPolyline>;
@@ -158,7 +159,7 @@ inline double GradToRad(double grad) { return std::numbers::pi * grad / 180.0; }
 inline double RadToGrad(double rad) { return rad * 180.0 / std::numbers::pi; }
 
 // Наклон отрезка
-inline double LineSlope(const Point& p1, const Point& p2) noexcept {
+inline double LineSlope(const Point& p1, const Point& p2) {
     return std::atan2((p2.y - p1.y), (p2.x - p1.x));
 }
 // Наклон в виде компонент
@@ -168,15 +169,25 @@ inline auto SlopeComponents(const Point& p1, const Point& p2) noexcept {
 
 // Проверка коллинеарности трех точек через векторное произведение
 inline bool IsCollinear(const Point& a, const Point& b, const Point& c,
-                        double abs_epsilon = 1e-12,
-                        double rel_epsilon = 1e-8) {
+    double abs_epsilon = 1e-12,
+    double rel_epsilon = 1e-8) {
     const double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     return ApproximatelyEqual(area, 0.0, abs_epsilon, rel_epsilon);
 }
 
+// Проверка параллельности линий
+inline bool IsParallelLines(const Point& p1, const Point& p2, const Point& p3, const Point& p4,
+    double abs_epsilon = 1e-12,
+    double rel_epsilon = 1e-8) {
+    // Вычисляем знаменатель
+    double denominator = (p4.x - p3.x) * (p2.y - p1.y) - (p2.x - p1.x) * (p4.y - p3.y);
+
+    return IsZero(denominator, abs_epsilon, rel_epsilon);
+}
+
 // Находит точку пересечения двух отрезков
 std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2,
-    const Point& p3, const Point& p4);
+    const Point& p3, const Point& p4, double abs_epsilon = 1e-12, double rel_epsilon = 1e-8);
 
 // Находит пересечение двух бесконечных прямых, заданных двумя точками
 std::optional<Point> FindLinesIntersection(const Point& p1, const Point& p2,
@@ -203,13 +214,12 @@ bool IsPolylinePointInPolygon(const Polyline& polyline, const Polygon& poly);
 
 double DistanceBetweenPoints(const Point& p1, const Point& p2);
 
-// Проверка параллельности линий
-bool IsPerpendicularLines(const Point& p1, const Point& p2, const Point& p3, const Point& p4);
-
 RawPolyline RemoveExtraDots(const RawPolyline& polyline, double abs_epsilon = 1e-12,
     double rel_epsilon = 1e-7);
 
 RawData RemoveExtraDots(const RawData& data, double abs_epsilon = 1e-12,
     double rel_epsilon = 1e-7);
+
+Point СalculateBisector(const Point& a, const Point& b, const Point& c, double length);
 
 } // namespace domain {
