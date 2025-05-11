@@ -222,4 +222,8 @@ RawData RemoveExtraDots(const RawData& data, double abs_epsilon = 1e-12,
 
 Point СalculateBisector(const Point& a, const Point& b, const Point& c, double length);
 
+Point ExtendLine(const Point& start, const Point& end, double distance);
+
+Point GetPointOnRay(const Point& start, const Point& direction, double distance);
+
 } // namespace domain {

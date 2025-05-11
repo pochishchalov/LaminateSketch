@@ -56,7 +56,7 @@ protected:
     std::vector<T> data_;
 };
 
-struct Ply : public VectorWrapper<Node> {
+struct Ply : VectorWrapper<Node> {
     domain::ORI ori = domain::ORI::ZERO;
 
     Node& AddNode(Node&& node) {
@@ -67,33 +67,56 @@ struct Ply : public VectorWrapper<Node> {
     }
 
     Node& InsertNode(size_t index, Node&& node) {
-        auto new_node = data_.emplace(data_.begin() + index, std::move(node));
-        for (size_t i = index + 1; i < PointsCount(); ++i) {
-            ++data_[i].pos.node_pos;
-        }
-        return *new_node;
+        return *data_.emplace(data_.begin() + index, std::move(node));
     }
 
     Node& GetNode(size_t index) {
         return data_.at(index);
     }
+    const Node& GetNode(size_t index) const {
+        return data_.at(index);
+    }
     Node& GetFirstNode() {
+        return *data_.begin();
+    }
+    const Node& GetFirstNode() const {
         return *data_.begin();
     }
     Node& GetLastNode() {
         return data_.back();
     }
+    const Node& GetLastNode() const {
+        return data_.back();
+    }
 
     size_t PointsCount() const noexcept { return data_.size(); }
+
+    void OffsetPly(double offset) {
+        domain::Polyline poly;
+        poly.reserve(PointsCount());
+        std::cout << "PointsCount: " << PointsCount() << std::endl;
+        for (const auto& node : data_) {
+            poly.emplace_back(domain::Point{ node.point });
+        }
+        poly = domain::OffsetPolyline(poly, offset);
+        std::cout << "poly.size(): " << poly.size() << std::endl;
+        for (size_t i = 0; i < poly.size(); ++i) {
+            data_[i].point = poly[i];
+        }
+    }
+
 };
 
-struct Layer : public VectorWrapper<Ply> {
-    // Добавляем методы для работы со слоями
+struct Layer : VectorWrapper<Ply> {
     Ply& AddPly() {
         return data_.emplace_back(Ply{});
     }
 
     Ply& GetPly(size_t index) {
+        return data_.at(index);
+    }
+
+    const Ply& GetPly(size_t index) const {
         return data_.at(index);
     }
 
@@ -132,12 +155,10 @@ public:
 
     std::vector<Layer>& GetData() { return layers_; }
 
-    // Управление памятью
     void ReserveLayers(size_t size) { layers_.reserve(size); }
     size_t LayersCount() const noexcept { return layers_.size(); }
     bool IsEmpty() const { return layers_.empty(); }
 
-    // Создание новых слоев
     Layer& AddLayer() {
         return layers_.emplace_back(Layer{});
     }
@@ -145,24 +166,72 @@ public:
     Layer& GetLayer(size_t index) {
         return layers_.at(index);
     }
-
-    Node& InsertNode(NodePos pos, Node&& node) {
-        return GetLayer(pos.layer_pos)
-            .GetPly(pos.ply_pos)
-            .InsertNode(pos.node_pos, std::move(node));
+    const Layer& GetLayer(size_t index) const {
+        return layers_.at(index);
     }
 
-    bool IsLastNodeInPly(const NodePos pos) {
+    Node& InsertNode(const NodePos pos, Node&& node) {
+        Ply& ply = GetLayer(pos.layer_pos).GetPly(pos.ply_pos);
+        Node& new_node = ply.InsertNode(pos.node_pos, std::move(node));
+        new_node.pos = pos;
+        
+        for (size_t i = pos.node_pos + 1; i < ply.PointsCount(); ++i) {
+            Node& node = ply.GetNode(i);
+            ++node.pos.node_pos;
+            if (node.bottom_pos.has_value()) {
+                ++GetNode(node.bottom_pos.value()).top_pos.value().node_pos;
+            }
+            if (node.top_pos.has_value()) {
+                ++GetNode(node.top_pos.value()).bottom_pos.value().node_pos;
+            }
+        }
+        return new_node;
+    }
+
+    NodePos GetStartNodePos() const {
+        assert(!layers_.empty() && "Data is empty");
+        Node result = GetNode(NodePos{ .layer_pos = 0, .ply_pos = 0, .node_pos = 0 });
+        Node node = result;
+        while (node.top_pos.has_value()) {
+            node = GetNode(node.top_pos.value());
+            if (node.pos.node_pos != 0) {
+                node = GetLayer(node.pos.layer_pos).GetPly(node.pos.ply_pos).GetFirstNode();
+                result = node;
+            }
+        }
+        std::cout << "StartNodePos: " << result.pos.layer_pos << ' ' << result.pos.ply_pos << ' ' << result.pos.node_pos << std::endl;
+        return result.pos;
+    }
+
+    NodePos GetLowestNodePos(const NodePos pos) const {
+        Node node = GetNode(pos);
+
+        while (node.bottom_pos.has_value()) {
+            node = GetNode(node.bottom_pos.value());
+        }
+
+        return node.pos;
+    }
+
+    NodePos GetTopMostNodePos(const NodePos pos) const {
+        Node node = GetNode(pos);
+
+        while (node.top_pos.has_value()) {
+            node = GetNode(node.top_pos.value());
+        }
+
+        return node.pos;
+    }
+
+    bool IsLastNodeInPly(const NodePos pos) const {
         size_t size = GetLayer(pos.layer_pos).GetPly(pos.ply_pos).PointsCount() - 1;
         return static_cast<unsigned short>(size)
             == pos.node_pos;
     }
 
-    bool IsFirstNodeInPly(const NodePos pos) {
+    bool IsFirstNodeInPly(const NodePos pos) const {
         return static_cast <unsigned short>(0) == pos.node_pos;
     }
-
-    void ReverseLayers() { std::reverse(layers_.begin(), layers_.end()); }
 
 private:
     std::vector<Layer> layers_;

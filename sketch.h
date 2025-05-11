@@ -10,12 +10,12 @@ namespace ls {  // laminate sketch
 
 
 class Sketch {
-    const static int DEFAULT_WIDTH = 200;
+    const static int DEFAULT_OFFSET = 1;
+    const static int DEFAULT_SEG_LEN = 20;
 public:
     Sketch()
         :width_(0.)
         ,height_(0.)
-        ,min_dist_between_plies_(0.)
     {
     }
         
@@ -33,14 +33,13 @@ public:
 
     void ScaleSketch(double scale);
 
-    void OptimizeSketchForWidth(int width);
+    void OptimizeSketch(double offset, double segment_len);
 
 private:
     Data original_data_;
     Data optimized_data_;
     double width_;
     double height_;
-    double min_dist_between_plies_;
 };
 
 }  // namespace ls

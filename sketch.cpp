@@ -1,4 +1,6 @@
+
 #include <limits>
+#include <numeric>
 
 #include "sketch.h"
 
@@ -8,10 +10,10 @@ namespace domain {
 bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch) {
     // Смещаем проверяемую линию вверх и убираем самопересечения
     auto offset = RemoveSelfIntersections(OffsetPolyline(input, 3.));  // Смещение на 3 достаточно для всех случаев
-                                                                       // не существует слоистых материалов с толщиной монослоя более 3
+        // не существует слоистых материалов с толщиной монослоя более 3
 
-// Проверка пересечения остальных линий эскиза с линиями соединяющими
-// начальные и конечные точки 'input' и 'offset'
+    // Проверка пересечения остальных линий эскиза с линиями соединяющими
+    // начальные и конечные точки 'input' и 'offset'
     for (const auto& layer : raw_sketch) {
         if (&input == &layer.polyline) {
             continue;  // Пропускаем проверяемую линию
@@ -73,7 +75,7 @@ Borders GetBorders(const RawData& raw_sketch) {
 }
 
 // Перемещает "сырой" эскиз в начало координат (0,0), возвращает его габариты widht, height
-std::pair<float, float> MoveRawSketchToZeroAndGetDimensions(RawData& raw_sketch) {
+std::pair<double, double> MoveRawSketchToZeroAndGetDimensions(RawData& raw_sketch) {
     const auto borders = GetBorders(raw_sketch);
 
     for (auto& layer : raw_sketch) {
@@ -89,8 +91,8 @@ std::pair<float, float> MoveRawSketchToZeroAndGetDimensions(RawData& raw_sketch)
 // Оптимизирует линии эскиза так, чтобы точки линии шли слева направо
 void StartPointOptimization(RawData& raw_sketch) {
     for (auto& layer : raw_sketch) {
-        const float first_point_x = layer.polyline.begin()->x;
-        const float last_point_x = layer.polyline.back().x;
+        const double first_point_x = layer.polyline.begin()->x;
+        const double last_point_x = layer.polyline.back().x;
 
         if (first_point_x > last_point_x) {
             std::reverse(layer.polyline.begin(), layer.polyline.end());
@@ -115,17 +117,17 @@ std::vector<RawData::iterator>GetUpperPlies(RawData& raw_sketch) {
 // Общая функция для проверки и установки соединения
 // Возвращает результат соединения с левой 'first' и правой 'second' точкой
 std::pair<bool, bool> TryConnectIntersection(const std::optional<Point>& intersect,
-    ls::Node& first, ls::Node& second,
-    ls::Node& connectable_node) {
+                                             ls::Node& first, ls::Node& second,
+                                             ls::Node& connectable_node) {
     if (!intersect) {
         return { false, false };
-    } 
+    }
 
     bool is_first = ApproximatelyEqual(*intersect, first.point, 1e-4);
     bool is_second = ApproximatelyEqual(*intersect, second.point, 1e-4);
     if (!is_first && !is_second) {
         return { false, false };
-    } 
+    }
 
     ls::Node& target = is_first ? first : second;
     if (!target.top_pos && !connectable_node.bottom_pos) {
@@ -138,7 +140,7 @@ std::pair<bool, bool> TryConnectIntersection(const std::optional<Point>& interse
 
 // Соединяет неиспользованные точки с сегментом граниченным узлами first и last
 void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
-    std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
+                          std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
 {
     for (auto& [node_pos, is_tied] : unused_nodes) {
 
@@ -147,7 +149,7 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
         if (connectable.bottom_pos.has_value()) {
             continue;
         }
-        
+
         const bool is_first_node = data.IsFirstNodeInPly(node_pos);
         const bool is_last_node = data.IsLastNodeInPly(node_pos);
 
@@ -155,15 +157,15 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
         // Соседний узел слева
         if (!is_first_node) {
             neighbors.push_back(&data.GetNode(ls::NodePos{
-            node_pos.layer_pos, node_pos.ply_pos,
-            static_cast<unsigned short>(node_pos.node_pos - 1) }));
-        } 
+                                                          node_pos.layer_pos, node_pos.ply_pos,
+                                                          static_cast<unsigned short>(node_pos.node_pos - 1) }));
+        }
         // Соседний узел справа
         if (!is_last_node) {
             neighbors.push_back(&data.GetNode(ls::NodePos{
-            node_pos.layer_pos, node_pos.ply_pos,
-            static_cast<unsigned short>(node_pos.node_pos + 1) }));
-        } 
+                                                          node_pos.layer_pos, node_pos.ply_pos,
+                                                          static_cast<unsigned short>(node_pos.node_pos + 1) }));
+        }
 
         // Обработка биссектрисы
         if (!is_first_node && !is_last_node) {
@@ -198,7 +200,7 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
             };
 
             auto intersection = FindSegmentsIntersection(first.point, second.point,
-                perp_line.first, perp_line.second, 1e-4);
+                                                         perp_line.first, perp_line.second, 1e-4);
 
             auto [is_first, is_second] = TryConnectIntersection(
                 intersection, first, second, connectable);
@@ -228,7 +230,7 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
                     intersection_point = intersections[1];
                 }
             }
-            
+
             ls::Node& new_node = data.InsertNode(second.pos, ls::Node{ .point = intersection_point, .pos = second.pos });
             new_node.top_pos.emplace(connectable.pos);
             connectable.bottom_pos.emplace(new_node.pos);
@@ -238,11 +240,12 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
 }
 
 void ConnectNodes(ls::Ply& ply, ls::Data& data, std::vector<std::pair<ls::NodePos, bool>>& unused_nodes) {
+    // Вызов GetLastNode() необходим каждый раз, т.к. в сегмент 'ply' могут добавляться новые узлы
     for (auto pos = ply.GetFirstNode().pos; pos <= ply.GetLastNode().pos; ++pos.node_pos) {
         if (pos.node_pos != 0) {
             ls::Node& first = data.GetNode(ls::NodePos{ .layer_pos = pos.layer_pos,
-                                                        .ply_pos = pos.ply_pos,
-                                                        .node_pos = static_cast<unsigned short>(pos.node_pos - 1) });
+                                                       .ply_pos = pos.ply_pos,
+                                                       .node_pos = static_cast<unsigned short>(pos.node_pos - 1) });
             ls::Node& second = data.GetNode(pos);
 
             ConnectLineWithNodes(first, second, data, unused_nodes);
@@ -251,13 +254,13 @@ void ConnectNodes(ls::Ply& ply, ls::Data& data, std::vector<std::pair<ls::NodePo
 }
 
 void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
-    std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
+              std::vector<std::pair<ls::NodePos, bool>>& unused_nodes)
 {
     // Сортировка сегментов слева направо
     std::sort(upper_plies.begin(), upper_plies.end(),
-        [](const auto& lhs, const auto& rhs) {
-            return lhs->polyline.begin()->x < rhs->polyline.begin()->x;
-        });
+              [](const auto& lhs, const auto& rhs) {
+                  return lhs->polyline.begin()->x < rhs->polyline.begin()->x;
+              });
 
     const unsigned short layer_pos = data.LayersCount(); // Опережающее присвоение чтобы не вычитать единицу
     auto& new_layer = data.AddLayer();
@@ -268,7 +271,7 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
     for (auto& ply : upper_plies) {
         const unsigned short ply_pos = data.GetLayer(layer_pos).PliesCount(); // Опережающее присвоение чтобы не вычитать единицу
         auto& new_ply = new_layer.AddPly();
-        
+
         const auto points_count = ply->PointsCount();
 
         new_ply.ori = ply->ori;
@@ -281,7 +284,7 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
                 .pos = {.layer_pos = layer_pos,
                         .ply_pos = ply_pos,
                         .node_pos = i}
-                });
+            });
         }
         // Соединяем узлы нового сегмента с неиспользованными узлами
         if (!is_first_layer) {
@@ -292,9 +295,9 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
     // Очистка от использованных узлов
     unused_nodes.erase(
         std::remove_if(unused_nodes.begin(), unused_nodes.end(),
-            [](const auto& p) { return p.second; }),
+                       [](const auto& p) { return p.second; }),
         unused_nodes.end()
-    );
+        );
 
     // Узлы нового сегмента добавляются к неиспользованным
     size_t total_nodes = 0;
@@ -309,9 +312,29 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
             unused_nodes.emplace_back(
                 ls::NodePos{ layer_pos, ply_pos, node_pos },
                 false
-            );
+                );
         }
     }
+}
+
+void ReverseLayers(ls::Data& data) {
+
+    unsigned short correction_pos = data.LayersCount() - 1;
+
+    for (auto& layer : data) {
+        for (auto& ply : layer) {
+            for (auto& node : ply) {
+                node.pos.layer_pos = correction_pos - node.pos.layer_pos;
+                if (auto top = node.top_pos.has_value()) {
+                    node.top_pos.value().layer_pos = correction_pos - node.top_pos.value().layer_pos;
+                }
+                if (auto bottom = node.bottom_pos.has_value()) {
+                    node.bottom_pos.value().layer_pos = correction_pos - node.bottom_pos.value().layer_pos;
+                }
+            }
+        }
+    }
+    std::reverse(data.begin(), data.end());
 }
 
 ls::Data ConvertRawSketch(RawData&& raw_sketch) {
@@ -324,7 +347,7 @@ ls::Data ConvertRawSketch(RawData&& raw_sketch) {
 
     while (!raw_sketch.empty()) {          // Создаем слои эскиза из линий "сырого" эскиза
 
-       auto upper_plies = GetUpperPlies(raw_sketch);
+        auto upper_plies = GetUpperPlies(raw_sketch);
 
         if (upper_plies.empty()) {          // Ошибка обработки
             return {};
@@ -336,7 +359,7 @@ ls::Data ConvertRawSketch(RawData&& raw_sketch) {
             raw_sketch.erase(pos);
         }
     }
-    result.ReverseLayers();
+    ReverseLayers(result);
     return result;
 }
 
@@ -352,13 +375,130 @@ void ScaleLayers(ls::Data& layers, double scale)
     }
 }
 
+std::optional<ls::NodePos> TryGetNextPos(const ls::NodePos pos, ls::Data& layers) {
+    if (!layers.IsLastNodeInPly(pos)) {
+        return layers.GetLayer(pos.layer_pos).GetPly(pos.ply_pos).GetNode(pos.node_pos + 1).pos;
+    }
+    ls::Node& node = layers.GetNode(pos);
+    if (node.top_pos.has_value()) {
+        return TryGetNextPos(node.top_pos.value(), layers);
+    }
+    return std::nullopt;
+}
+
+double GetMinDistanceGroupNodes(const ls::NodePos pos, ls::Data& layers) {
+    ls::Node node = layers.GetNode(pos);
+
+    double result = std::numeric_limits<double>::max();
+
+    while (node.top_pos.has_value()) {
+        ls::Node top_node = layers.GetNode(node.top_pos.value());
+        result = std::min(result, DistanceBetweenPoints(node.point, top_node.point));
+        node = layers.GetNode(top_node.pos);
+    }
+
+    return result;
+}
+
+double GetMinDistanceBetweenPlies(ls::Data& layers) {
+
+    double result = std::numeric_limits<double>::max();
+
+    auto pos = layers.GetStartNodePos();
+
+    while (true) {
+        result = std::min(result, GetMinDistanceGroupNodes(pos, layers));
+        auto next_pos = TryGetNextPos(pos, layers);
+        if (next_pos.has_value()) {
+            pos = layers.GetLowestNodePos(next_pos.value());
+        }
+        else {
+            break;
+        }
+    }
+    return result;
+}
+
+double GetMinDistanceBetweenGroupNodes(const ls::NodePos first, const ls::NodePos second, ls::Data& layers) {
+    ls::Node first_node = layers.GetNode(first);
+    ls::Node second_node = layers.GetNode(second);
+
+    double result = DistanceBetweenPoints(first_node.point, second_node.point);
+
+    while (true) {
+        if (first_node.top_pos.has_value() && second_node.top_pos.has_value()) {
+            first_node = layers.GetNode(first_node.top_pos.value());
+            second_node = layers.GetNode(second_node.top_pos.value());
+            result = std::min(result, DistanceBetweenPoints(first_node.point, second_node.point));
+        }
+        else {
+            break;
+        }
+    }
+
+    return result;
+}
+
+void CompressPairGroupNodes(const ls::NodePos first, const ls::NodePos second, ls::Data& layers, double max_distance) {
+    ls::Node first_node = layers.GetNode(first);
+    ls::Node second_node = layers.GetNode(second);
+
+    auto mid_point = GetPointOnRay(first_node.point, second_node.point, max_distance);
+    double dx = second_node.point.x - mid_point.x;
+    double dy = second_node.point.y - mid_point.y;
+
+    auto pos = second;
+
+    while (true) {
+        auto i_pos = pos;
+        while (true) {
+            ls::Node& changed_node = layers.GetNode(i_pos);
+            changed_node.point.x -= dx;
+            changed_node.point.y -= dy;
+            if (changed_node.top_pos.has_value()) {
+                i_pos = changed_node.top_pos.value();
+            }
+            else {
+                break;
+            }
+        }
+        auto next_pos = TryGetNextPos(pos, layers);
+        if (next_pos.has_value()) {
+            pos = layers.GetLowestNodePos(next_pos.value());
+        }
+        else {
+            break;
+        }
+    }
+}
+
+void CompressSketch(ls::Data& layers, double max_distance) {
+    auto first = layers.GetStartNodePos();
+    auto second = TryGetNextPos(first, layers).value();
+
+    while (true) {
+        double distance = GetMinDistanceBetweenGroupNodes(first, second, layers);
+        if (max_distance < distance) {
+            CompressPairGroupNodes(first, second, layers, max_distance);
+        }
+        auto next_pos = TryGetNextPos(second, layers);
+        if (next_pos.has_value()) {
+            first = second;
+            second = layers.GetLowestNodePos(next_pos.value());
+        }
+        else {
+            break;
+        }
+    }
+}
+
 } // namespace domain
 
 
 namespace ls {
 
 using namespace domain;
-    
+
 domain::RawData Sketch::GetRawSketch() const {
     RawData result;
 
@@ -376,23 +516,23 @@ domain::RawData Sketch::GetRawSketch() const {
 
     return result;
 }
-    
+
 bool Sketch::FillSketch(domain::RawData&& raw_sketch) {
 
-   auto [width, height] = MoveRawSketchToZeroAndGetDimensions(raw_sketch);
+    auto [width, height] = MoveRawSketchToZeroAndGetDimensions(raw_sketch);
 
-   width_ = width, height_ = height;
+    width_ = width, height_ = height;
 
-   auto data = ls::ConvertRawSketch(std::move(raw_sketch));
+    auto data = ls::ConvertRawSketch(std::move(raw_sketch));
 
     if (data.IsEmpty()) {
         return false;
     }
     else {
-            
+
         original_data_ = (std::move(data));
 
-        OptimizeSketchForWidth(Sketch::DEFAULT_WIDTH);
+        OptimizeSketch(Sketch::DEFAULT_OFFSET, Sketch::DEFAULT_SEG_LEN);
 
         return true;
     }
@@ -402,16 +542,16 @@ void Sketch::ScaleSketch(double scale) {
     ScaleLayers(optimized_data_, scale);
 }
 
-void Sketch::OptimizeSketchForWidth(int width) {
-   auto temp_layers_ = original_data_;
+void Sketch::OptimizeSketch(double offset, double segment_len) {
+    auto temp_layers_ = original_data_;
 
-   //ScaleLayers(temp_layers_, width / width_);
+    double min_distance = GetMinDistanceBetweenPlies(temp_layers_);
 
-   //double offset_factor = 3. / СalculateMinDistanceBetweenPlies(temp_layers_);
+    ScaleLayers(temp_layers_, offset / min_distance);
 
-   //optimized_layers_ = OffsetLayers(temp_layers_, 2);
+    CompressSketch(temp_layers_, segment_len);
 
-   optimized_data_ = temp_layers_;
+    optimized_data_ = temp_layers_;
 
 }
 

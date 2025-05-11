@@ -324,4 +324,50 @@ Point СalculateBisector(const Point& a, const Point& b, const Point& c, double 
     return bisector_end;
 }
 
+Point ExtendLine(const Point& start, const Point& end, double distance) {
+    // Вычисляем вектор направления
+    double dx = end.x - start.x;
+    double dy = end.y - start.y;
+
+    // Вычисляем длину отрезка
+    double length = std::sqrt(dx * dx + dy * dy);
+
+    // Если точки совпадают, возвращаем конечную точку
+    if (length == 0.0) {
+        return end;
+    } 
+
+    // Нормализуем вектор и умножаем на расстояние
+    double extend_x = (dx / length) * distance;
+    double extend_y = (dy / length) * distance;
+
+    // Создаем новую точку
+    return {
+        end.x + extend_x,
+        end.y + extend_y
+    };
+}
+
+Point GetPointOnRay(const Point& start, const Point& direction, double distance) {
+    // Вычисляем вектор направления луча
+    double dx = direction.x - start.x;
+    double dy = direction.y - start.y;
+
+    // Вычисляем длину вектора направления
+    double length = std::sqrt(dx * dx + dy * dy);
+
+    // Если точки совпадают, возвращаем стартовую точку
+    if (length == 0.0) return start;
+
+    // Нормализуем вектор направления и умножаем на расстояние
+    double offsetX = (dx / length) * distance;
+    double offsetY = (dy / length) * distance;
+
+    // Вычисляем новую точку
+    return {
+        start.x + offsetX,
+        start.y + offsetY
+    };
+}
+
 } // namespace domain
