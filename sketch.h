@@ -10,9 +10,10 @@ namespace ls {  // laminate sketch
 
 
 class Sketch {
+public:
     const static int DEFAULT_OFFSET = 1;
     const static int DEFAULT_SEG_LEN = 20;
-public:
+
     Sketch()
         :width_(0.)
         ,height_(0.)

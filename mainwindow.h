@@ -33,6 +33,7 @@ public:
     int GetHeight() const { return height_; }
     bool IsEmpty() { return sketch_.empty(); }
     void DrawSketch(QPainter* painter);
+    void UpdateSketch(ls::Sketch &sketch, QRect window);
 
 private:
     std::vector<DrawableLayer> sketch_;
@@ -62,11 +63,17 @@ private slots:
 
     void on_btn_save_file_clicked();
 
+    void on_sb_offset_valueChanged(double arg1);
+
+    void on_sb_length_valueChanged(double arg1);
+
 private:
     Ui::MainWindow *ui;
 
     dxf::DxfHandler handler_;
     ls::Sketch sketch_;
     DrawableSketch drawable_sketch_;
+    double offset_ = ls::Sketch::DEFAULT_OFFSET;
+    double length_ = ls::Sketch::DEFAULT_SEG_LEN;
 };
 #endif // MAINWINDOW_H

@@ -76,6 +76,12 @@ void DrawableSketch::DrawSketch(QPainter *painter){
     painter->setPen(old_pen);
 }
 
+void DrawableSketch::UpdateSketch(ls::Sketch &sketch, QRect window)
+{
+    sketch_.clear();
+    CreateSketch(sketch, window);
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -287,6 +293,8 @@ void MainWindow::on_btn_open_file_clicked()
 
         if (is_correct_filling){
             drawable_sketch_.CreateSketch(sketch_, rect());
+            ui->sb_offset->setEnabled(true);
+            ui->sb_length->setEnabled(true);
 
             ui->lbl_message_text->setText("The file was successfully uploaded");
         }
@@ -351,3 +359,21 @@ void MainWindow::on_btn_save_file_clicked()
         ui->lbl_message_text->setText("Error. The file was not saved");
     }
 }
+
+void MainWindow::on_sb_offset_valueChanged(double new_offset)
+{
+    offset_ = new_offset;
+    sketch_.OptimizeSketch(offset_, length_);
+    drawable_sketch_.UpdateSketch(sketch_, rect());
+    update();
+}
+
+
+void MainWindow::on_sb_length_valueChanged(double new_length)
+{
+    length_ = new_length;
+    sketch_.OptimizeSketch(offset_, length_);
+    drawable_sketch_.UpdateSketch(sketch_, rect());
+    update();
+}
+
