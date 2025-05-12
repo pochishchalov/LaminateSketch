@@ -94,12 +94,10 @@ struct Ply : VectorWrapper<Node> {
     void OffsetPly(double offset) {
         domain::Polyline poly;
         poly.reserve(PointsCount());
-        std::cout << "PointsCount: " << PointsCount() << std::endl;
         for (const auto& node : data_) {
             poly.emplace_back(domain::Point{ node.point });
         }
         poly = domain::OffsetPolyline(poly, offset);
-        std::cout << "poly.size(): " << poly.size() << std::endl;
         for (size_t i = 0; i < poly.size(); ++i) {
             data_[i].point = poly[i];
         }
@@ -199,7 +197,6 @@ public:
                 result = node;
             }
         }
-        std::cout << "StartNodePos: " << result.pos.layer_pos << ' ' << result.pos.ply_pos << ' ' << result.pos.node_pos << std::endl;
         return result.pos;
     }
 

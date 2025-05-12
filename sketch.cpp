@@ -10,7 +10,7 @@ namespace domain {
 bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch) {
     // Смещаем проверяемую линию вверх и убираем самопересечения
     auto offset = RemoveSelfIntersections(OffsetPolyline(input, 3.));  // Смещение на 3 достаточно для всех случаев
-        // не существует слоистых материалов с толщиной монослоя более 3
+    // не существует слоистых материалов с толщиной монослоя более 3
 
     // Проверка пересечения остальных линий эскиза с линиями соединяющими
     // начальные и конечные точки 'input' и 'offset'
@@ -45,47 +45,24 @@ bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch) {
     return true;
 }
 
-struct Borders {
-    double left = 0.;
-    double bottom = 0.;
-    double right = 0.;
-    double top = 0.;
-};
-
-// Возвращает границы "сырого" эскиза
-Borders GetBorders(const RawData& raw_sketch) {
-    Borders result{
-        .left = std::numeric_limits<double>::max(),
-        .bottom = std::numeric_limits<double>::max(),
-        .right = std::numeric_limits<double>::min(),
-        .top = std::numeric_limits<double>::min()
-    };
-
+// Перемещает "сырой" эскиз в начало координат (0,0)
+void MoveRawSketchToZero(RawData& raw_sketch) {
+    double left = std::numeric_limits<double>::max();
+    double bottom = std::numeric_limits<double>::max();
 
     for (const auto& layer : raw_sketch) {
         for (const auto point : layer.polyline) {
-            result.left = std::min(result.left, point.x);
-            result.bottom = std::min(result.bottom, point.y);
-            result.right = std::max(result.right, point.x);
-            result.top = std::max(result.top, point.y);
+            left = std::min(left, point.x);
+            bottom = std::min(bottom, point.y);
         }
     }
-
-    return result;
-}
-
-// Перемещает "сырой" эскиз в начало координат (0,0), возвращает его габариты widht, height
-std::pair<double, double> MoveRawSketchToZeroAndGetDimensions(RawData& raw_sketch) {
-    const auto borders = GetBorders(raw_sketch);
 
     for (auto& layer : raw_sketch) {
         for (auto& point : layer.polyline) {
-            point.x -= borders.left;
-            point.y -= borders.bottom;
+            point.x -= left;
+            point.y -= bottom;
         }
     }
-
-    return std::make_pair((borders.right - borders.left), (borders.top - borders.bottom));
 }
 
 // Оптимизирует линии эскиза так, чтобы точки линии шли слева направо
@@ -321,6 +298,7 @@ void ReverseLayers(ls::Data& data) {
 
     unsigned short correction_pos = data.LayersCount() - 1;
 
+    // Переворачиваем layer_pos в позиции узлов
     for (auto& layer : data) {
         for (auto& ply : layer) {
             for (auto& node : ply) {
@@ -450,13 +428,13 @@ void CompressPairGroupNodes(const ls::NodePos first, const ls::NodePos second, l
     auto pos = second;
 
     while (true) {
-        auto i_pos = pos;
+        auto temp_pos = pos;
         while (true) {
-            ls::Node& changed_node = layers.GetNode(i_pos);
+            ls::Node& changed_node = layers.GetNode(temp_pos);
             changed_node.point.x -= dx;
             changed_node.point.y -= dy;
             if (changed_node.top_pos.has_value()) {
-                i_pos = changed_node.top_pos.value();
+                temp_pos = changed_node.top_pos.value();
             }
             else {
                 break;
@@ -492,6 +470,26 @@ void CompressSketch(ls::Data& layers, double max_distance) {
     }
 }
 
+std::pair<double, double> CalculateWidthAndHeight(ls::Data& layers) {
+    double left = std::numeric_limits<double>::max();
+    double bottom = std::numeric_limits<double>::max();
+    double right = std::numeric_limits<double>::min();
+    double top = std::numeric_limits<double>::min();
+
+    for (auto& layer : layers) {
+        for (auto& ply : layer) {
+            for (auto& node : ply) {
+                left = std::min(left, node.point.x);
+                right = std::max(right, node.point.x);
+                bottom = std::min(bottom, node.point.y);
+                top = std::max(top, node.point.y);
+            }
+        }
+    }
+
+    return { right - left, top - bottom };
+}
+
 } // namespace domain
 
 
@@ -519,9 +517,7 @@ domain::RawData Sketch::GetRawSketch() const {
 
 bool Sketch::FillSketch(domain::RawData&& raw_sketch) {
 
-    auto [width, height] = MoveRawSketchToZeroAndGetDimensions(raw_sketch);
-
-    width_ = width, height_ = height;
+    MoveRawSketchToZero(raw_sketch);
 
     auto data = ls::ConvertRawSketch(std::move(raw_sketch));
 
@@ -531,6 +527,8 @@ bool Sketch::FillSketch(domain::RawData&& raw_sketch) {
     else {
 
         original_data_ = (std::move(data));
+
+        min_distance_between_plies_ = GetMinDistanceBetweenPlies(original_data_);
 
         OptimizeSketch(Sketch::DEFAULT_OFFSET, Sketch::DEFAULT_SEG_LEN);
 
@@ -545,14 +543,17 @@ void Sketch::ScaleSketch(double scale) {
 void Sketch::OptimizeSketch(double offset, double segment_len) {
     auto temp_layers_ = original_data_;
 
-    double min_distance = GetMinDistanceBetweenPlies(temp_layers_);
+    double scale = offset / min_distance_between_plies_;
 
-    ScaleLayers(temp_layers_, offset / min_distance);
+    CompressSketch(temp_layers_, segment_len / scale);
 
-    CompressSketch(temp_layers_, segment_len);
+    ScaleLayers(temp_layers_, scale);
 
-    optimized_data_ = temp_layers_;
+    auto [width, height] = CalculateWidthAndHeight(temp_layers_);
 
+    width_ = width, height_ = height;
+
+    std::swap(optimized_data_, temp_layers_);
 }
 
 } // namespace ls
