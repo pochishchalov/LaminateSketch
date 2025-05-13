@@ -4,7 +4,7 @@
 
 # Laminate Sketch.
 
-Специализированный 2D-редактор эскизов композиционных структур
+Специализированный 2D-редактор эскизов композиционных структур полученных в Fibersim
 
 <div id="mainwindow">
   <img src="https://github.com/pochishchalov/LaminateSketch/blob/main/pictures/main_window.png?raw=true" width="800"/>
