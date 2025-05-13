@@ -279,7 +279,6 @@ void MainWindow::on_btn_open_file_clicked()
                         QDir::currentPath(),
                         "*.dxf;*.dwg"
     );
-
     if (fileName.isEmpty()){
         return;
     }
