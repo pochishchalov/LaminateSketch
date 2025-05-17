@@ -62,11 +62,16 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(LaminateSketch
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        common.h sketch.h
-        common.cpp sketch.cpp
+        common.h
+	ls_iface.h
+        common.cpp
+	ls_iface.cpp
         ls_data.h
-        dx_data.h dx_iface.h handler.h
-        dx_iface.cpp handler.cpp
+        dx_data.h
+	dx_iface.h
+	dx_handler.h
+        dx_iface.cpp
+	dx_handler.cpp
         resources.qrc
 
     )
@@ -163,7 +168,7 @@ elseif (APPLE)
         PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
-    target_sources(LaminateSketchp PRIVATE icons/app_icon.icns)
+    target_sources(LaminateSketch PRIVATE icons/app_icon.icns)
     set_target_properties(LaminateSketch PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_ICON ${MACOSX_BUNDLE_ICON_FILE}

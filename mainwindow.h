@@ -4,8 +4,8 @@
 #include <QMainWindow>
 #include <QPainter>
 
-#include "handler.h"
-#include "sketch.h"
+#include "dx_handler.h"
+#include "ls_iface.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -26,14 +26,14 @@ public:
     {
     }
 
-    void CreateSketch(ls::Sketch& sketch, QRect window);
+    void CreateSketch(ls::Iface& sketch, QRect window);
     void SetOrigin(QRect window);
     QPoint GetOrigin() const { return origin_; }
     int GetWidth() const { return width_; }
     int GetHeight() const { return height_; }
     bool IsEmpty() { return sketch_.empty(); }
     void DrawSketch(QPainter* painter);
-    void UpdateSketch(ls::Sketch &sketch, QRect window);
+    void UpdateSketch(ls::Iface &sketch, QRect window);
 
 private:
     std::vector<DrawableLayer> sketch_;
@@ -70,10 +70,10 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    dxf::DxfHandler handler_;
-    ls::Sketch sketch_;
+    dx::Handler handler_;
+    ls::Iface sketch_;
     DrawableSketch drawable_sketch_;
-    double offset_ = ls::Sketch::DEFAULT_OFFSET;
-    double length_ = ls::Sketch::DEFAULT_SEG_LEN;
+    double offset_ = ls::Iface::DEFAULT_OFFSET;
+    double length_ = ls::Iface::DEFAULT_SEG_LEN;
 };
 #endif // MAINWINDOW_H

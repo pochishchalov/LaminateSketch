@@ -5,7 +5,7 @@
 #include <QFileDialog>
 #include <QString>
 
-void DrawableSketch::CreateSketch(ls::Sketch &sketch, QRect window)
+void DrawableSketch::CreateSketch(ls::Iface &sketch, QRect window)
 {
     const int pix_in_mm = MainWindow::PIX_IN_CM / 10;
 
@@ -76,7 +76,7 @@ void DrawableSketch::DrawSketch(QPainter *painter){
     painter->setPen(old_pen);
 }
 
-void DrawableSketch::UpdateSketch(ls::Sketch &sketch, QRect window)
+void DrawableSketch::UpdateSketch(ls::Iface &sketch, QRect window)
 {
     sketch_.clear();
     CreateSketch(sketch, window);
