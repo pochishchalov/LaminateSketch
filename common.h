@@ -22,10 +22,10 @@ struct Point {
 inline bool operator==(const Point& lhs, const Point& rhs) {
     double rel_epsilon = 1e-9;
     auto max_val = std::max({ 1.0, std::fabs(lhs.x), std::fabs(rhs.x),
-                   std::fabs(lhs.y), std::fabs(rhs.y) }) * rel_epsilon;
+                             std::fabs(lhs.y), std::fabs(rhs.y) }) * rel_epsilon;
     return std::abs(lhs.x - rhs.x) < max_val
-        && std::abs(lhs.y - rhs.y) < max_val;
-    }
+           && std::abs(lhs.y - rhs.y) < max_val;
+}
 
 inline bool operator!=(const Point& lhs, const Point& rhs) {
     return !(lhs == rhs);
@@ -34,19 +34,31 @@ inline bool operator!=(const Point& lhs, const Point& rhs) {
 using Polyline = std::vector<Point>;
 
 // Направление укладки сегмента
-enum class ORI {
-    NO_ORI,
-    ZERO,       // 0
-    PERP,       // 90
-    OTHER       // +-45 и другие
+enum class Orientation {
+    NoOrientation,
+    Zero,       // 0
+    Perpendicular,       // 90
+    Other       // +-45 и другие
 };
 
 struct RawPolyline {
     Polyline polyline;
-    ORI ori = ORI::ZERO;
+    domain::Orientation orientation = domain::Orientation::Zero;
 
-    size_t PointsCount() const { return polyline.size(); }
-    const Point& GetPoint(size_t index) const { return polyline[index]; }
+    // Метры доступа
+    [[nodiscard]] size_t pointsCount() const noexcept { return polyline.size(); }
+    [[nodiscard]] const Point& pointAt(size_t index) const { return polyline.at(index); }
+    [[nodiscard]] bool isEmpty() const noexcept { return polyline.empty(); }
+
+    // Модификаторы
+    void append(const Point& point) { polyline.push_back(point); }
+    void reserve(size_t capacity) { polyline.reserve(capacity); }
+
+    // Операторы сравнения
+    bool operator==(const RawPolyline& other) const {
+        return orientation == other.orientation && polyline == other.polyline;
+    }
+    bool operator!=(const RawPolyline& other) const { return !(*this == other); }
 };
 
 using RawData = std::list<RawPolyline>;
@@ -57,27 +69,29 @@ struct Polygon {
         :points_(points)
     {
     }
-    void AddPoint(Point p) {
+    void addPoint(Point p) {
         points_.push_back(p);
     }
-    void AddPolyline(const Polyline& polyline) {
+    void addPolyline(const Polyline& polyline) {
         points_.insert(points_.end(), polyline.begin(), polyline.end());
     }
-    void AddPolyline(Polyline&& polyline) {
+    void addPolyline(Polyline&& polyline) {
         points_.insert(points_.end(),
-            std::make_move_iterator(polyline.begin()),
-            std::make_move_iterator(polyline.end()));
+                       std::make_move_iterator(polyline.begin()),
+                       std::make_move_iterator(polyline.end()));
     }
-    const std::vector<Point>& GetPoints() const { return points_; }
-    size_t GetNumOfPoints() const { return points_.size(); }
+    [[nodiscard]] const std::vector<Point>& points() const noexcept { return points_; }
+    [[nodiscard]] size_t pointsCount() const noexcept { return points_.size(); }
+    [[nodiscard]] bool isEmpty() const noexcept { return points_.empty(); }
+
 private:
     std::vector<Point> points_;
 };
 
 // Универсальная проверка приблизительного равенства с разделением абсолютной и относительной погрешности
 inline bool ApproximatelyEqual(double lhs, double rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-9) {
+                               double abs_epsilon = 1e-12,
+                               double rel_epsilon = 1e-9) {
     // Сначала проверяем абсолютную разницу (для чисел около нуля)
     if (std::fabs(lhs - rhs) <= abs_epsilon) {
         return true;
@@ -89,16 +103,16 @@ inline bool ApproximatelyEqual(double lhs, double rhs,
 
 // Проверка приблизительного равенства двух точек
 inline bool ApproximatelyEqual(const Point& lhs, const Point& rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-7) {
+                               double abs_epsilon = 1e-12,
+                               double rel_epsilon = 1e-7) {
     return ApproximatelyEqual(lhs.x, rhs.x, abs_epsilon, rel_epsilon)
-        && ApproximatelyEqual(lhs.y, rhs.y, abs_epsilon, rel_epsilon);
+    && ApproximatelyEqual(lhs.y, rhs.y, abs_epsilon, rel_epsilon);
 }
 
 // Проверка приблизительного равенства двух ломаных
 inline bool ApproximatelyEqual(const Polyline& lhs, const Polyline& rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-7) {
+                               double abs_epsilon = 1e-12,
+                               double rel_epsilon = 1e-7) {
     if (lhs.size() != rhs.size()) {
         return false;
     }
@@ -112,16 +126,16 @@ inline bool ApproximatelyEqual(const Polyline& lhs, const Polyline& rhs,
 
 // Безопасная проверка на ноль с комбинированной погрешностью
 inline bool IsZero(double value,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-9) {
+                   double abs_epsilon = 1e-12,
+                   double rel_epsilon = 1e-9) {
     // Для нуля используем комбинированный подход
     return std::fabs(value) <= std::max(abs_epsilon, rel_epsilon * std::fabs(value));
 }
 
 // Безопасное сравнение с учетом погрешности
 inline bool IsLessOrEqual(double lhs, double rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-9) {
+                          double abs_epsilon = 1e-12,
+                          double rel_epsilon = 1e-9) {
     // Сначала точное сравнение
     if (lhs <= rhs) {
         return true;
@@ -131,8 +145,8 @@ inline bool IsLessOrEqual(double lhs, double rhs,
 }
 
 inline bool IsGreaterOrEqual(double lhs, double rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-9) {
+                             double abs_epsilon = 1e-12,
+                             double rel_epsilon = 1e-9) {
     if (lhs >= rhs) {
         return true;
     }
@@ -141,14 +155,14 @@ inline bool IsGreaterOrEqual(double lhs, double rhs,
 
 // Специализированные функции для строгих сравнений
 inline bool IsStrictlyLess(double lhs, double rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-9) {
+                           double abs_epsilon = 1e-12,
+                           double rel_epsilon = 1e-9) {
     return (lhs < rhs) && !ApproximatelyEqual(lhs, rhs, abs_epsilon, rel_epsilon);
 }
 
 inline bool IsStrictlyGreater(double lhs, double rhs,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-8) {
+                              double abs_epsilon = 1e-12,
+                              double rel_epsilon = 1e-8) {
     return (lhs > rhs) && !ApproximatelyEqual(lhs, rhs, abs_epsilon, rel_epsilon);
 }
 
@@ -169,16 +183,16 @@ inline auto SlopeComponents(const Point& p1, const Point& p2) noexcept {
 
 // Проверка коллинеарности трех точек через векторное произведение
 inline bool IsCollinear(const Point& a, const Point& b, const Point& c,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-8) {
+                        double abs_epsilon = 1e-12,
+                        double rel_epsilon = 1e-8) {
     const double area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     return ApproximatelyEqual(area, 0.0, abs_epsilon, rel_epsilon);
 }
 
 // Проверка параллельности линий
 inline bool IsParallelLines(const Point& p1, const Point& p2, const Point& p3, const Point& p4,
-    double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-8) {
+                            double abs_epsilon = 1e-12,
+                            double rel_epsilon = 1e-8) {
     // Вычисляем знаменатель
     double denominator = (p4.x - p3.x) * (p2.y - p1.y) - (p2.x - p1.x) * (p4.y - p3.y);
 
@@ -187,11 +201,11 @@ inline bool IsParallelLines(const Point& p1, const Point& p2, const Point& p3, c
 
 // Находит точку пересечения двух отрезков
 std::optional<Point> FindSegmentsIntersection(const Point& p1, const Point& p2,
-    const Point& p3, const Point& p4, double abs_epsilon = 1e-12, double rel_epsilon = 1e-8);
+                                              const Point& p3, const Point& p4, double abs_epsilon = 1e-12, double rel_epsilon = 1e-8);
 
 // Находит пересечение двух бесконечных прямых, заданных двумя точками
 std::optional<Point> FindLinesIntersection(const Point& p1, const Point& p2,
-    const Point& q1, const Point& q2);
+                                           const Point& q1, const Point& q2);
 
 // Проверяет находится ли точка внутри многоугольника
 bool IsPointInPolygon(const Point& test, const Polygon& polygon);
@@ -215,10 +229,10 @@ bool IsPolylinePointInPolygon(const Polyline& polyline, const Polygon& poly);
 double DistanceBetweenPoints(const Point& p1, const Point& p2);
 
 RawPolyline RemoveExtraDots(const RawPolyline& polyline, double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-7);
+                            double rel_epsilon = 1e-7);
 
 RawData RemoveExtraDots(const RawData& data, double abs_epsilon = 1e-12,
-    double rel_epsilon = 1e-7);
+                        double rel_epsilon = 1e-7);
 
 Point СalculateBisector(const Point& a, const Point& b, const Point& c, double length);
 

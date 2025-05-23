@@ -8,15 +8,15 @@ namespace dx {
 class Handler {
 public:
     Handler() = default;
-    bool ImportFile(std::string file_name);
-    bool ExportFile(std::string file_name, DRW::Version version, bool is_binary);
+    bool importFile(std::string file_name);
+    bool exportFile(std::string file_name, DRW::Version version, bool is_binary);
 
-    domain::RawData GetRawSketchFromData() const;
-    void PutRawSketchToData(const domain::RawData raw_sketch);
+    domain::RawData getRawSketch() const;
+    void putRawSketch(const domain::RawData raw_sketch);
 
 private:
-    Data input_data_;
-    Data output_data_;
+    Data inputData;
+    Data outputData;
 };
 
 } // namespace dxf

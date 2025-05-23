@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <cassert>
@@ -8,47 +9,47 @@
 
 namespace ls {  // laminate sketch
 
-    class Iface {
-    public:
-        const static int DEFAULT_OFFSET = 1;
-        const static int DEFAULT_SEG_LEN = 20;
+class Iface {
+public:
+    const static int DEFAULT_OFFSET = 1;
+    const static int DEFAULT_SEG_LEN = 20;
 
-        Iface()
-            :width_(0.)
-            ,height_(0.)
-            ,min_distance_between_plies_(0.)
-        {
-        }
+    Iface()
+        :width_(0.)
+        ,height_(0.)
+        ,min_distance_between_plies_(0.)
+    {
+    }
 
-        double Width() const noexcept { return width_; }
-        double Height() const noexcept { return height_; }
-        bool IsEmpty() const noexcept { return original_data_.IsEmpty(); }
+    double width() const noexcept { return width_; }
+    double height() const noexcept { return height_; }
+    bool isEmpty() const noexcept { return original_data_.isEmpty(); }
 
-        std::vector<Layer>& GetSketchLayers() { return optimized_data_.GetData(); }
-        std::vector<Layer>& GetOrigSketchLayers() { return original_data_.GetData(); }
+    std::vector<Layer>& sketchLayers() { return optimized_data_.getData(); }
+    std::vector<Layer>& origSketchLayers() { return original_data_.getData(); }
 
-        // Возвращает "сырой" эскиз для записи в dxf файл
-        domain::RawData GetRawSketch() const;
+    // Возвращает "сырой" эскиз для записи в dxf файл
+    domain::RawData rawSketch() const;
 
-        // Наполняет эскиз данными из "сырого" эскиза
-        bool FillSketch(domain::RawData&& raw_sketch);
+    // Наполняет эскиз данными из "сырого" эскиза
+    bool fillSketch(domain::RawData&& raw_sketch);
 
-        void ScaleSketch(double scale);
+    void scaleSketch(double scale);
 
-        void OptimizeSketch(double offset, double segment_len);
+    void optimizeSketch(double offset, double segment_len);
 
-    private:
-        Data original_data_;
-        Data optimized_data_;
-        double width_;
-        double height_;
-        double min_distance_between_plies_;
-    };
+private:
+    Data original_data_;
+    Data optimized_data_;
+    double width_;
+    double height_;
+    double min_distance_between_plies_;
+};
 
 }  // namespace ls
 
 namespace domain {
 
-    bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch);
+bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch);
 
 } //namespace domain

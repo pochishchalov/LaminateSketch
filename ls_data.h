@@ -9,19 +9,19 @@
 
 namespace ls {  // laminate sketch
 
-struct NodePos {
-    unsigned short layer_pos = 0;
-    unsigned short ply_pos = 0;
-    unsigned short node_pos = 0;
+struct NodePosition {
+    unsigned short layerPos = 0;
+    unsigned short plyPos = 0;
+    unsigned short nodePos = 0;
 
-    auto operator<=>(const NodePos&) const = default;
+    auto operator<=>(const NodePosition&) const = default;
 };
 
 struct Node {
     domain::Point point;
-    NodePos pos;
-    std::optional<NodePos> top_pos;
-    std::optional<NodePos> bottom_pos; 
+    NodePosition position;
+    std::optional<NodePosition> upperLink;
+    std::optional<NodePosition> lowerLink;
 };
 
 template <typename T>
@@ -57,7 +57,7 @@ protected:
 };
 
 struct Ply : VectorWrapper<Node> {
-    domain::ORI ori = domain::ORI::ZERO;
+    domain::Orientation orientation = domain::Orientation::Zero;
 
     Node& AddNode(Node&& node) {
         return data_.emplace_back(std::move(node));
@@ -132,30 +132,30 @@ public:
     ConstIterator begin() const noexcept { return layers_.begin(); }
     ConstIterator end() const noexcept { return layers_.end(); }
 
-    Node& GetNode(const NodePos pos) {
-        return layers_[pos.layer_pos][pos.ply_pos][pos.node_pos];
+    Node& GetNode(const NodePosition pos) {
+        return layers_[pos.layerPos][pos.plyPos][pos.nodePos];
     }
 
-    const Node& GetNode(const NodePos pos) const {
-        return layers_[pos.layer_pos][pos.ply_pos][pos.node_pos];
+    const Node& GetNode(const NodePosition pos) const {
+        return layers_[pos.layerPos][pos.plyPos][pos.nodePos];
     }
 
-    NodePos GetLastNodePos() {
+    NodePosition GetLastNodePos() {
         unsigned short layer_pos = static_cast<unsigned short>(layers_.size() - 1);
         unsigned short ply_pos = static_cast<unsigned short>(layers_[layer_pos].size() - 1);
         unsigned short node_pos = static_cast<unsigned short>(layers_[layer_pos][ply_pos].size() - 1);
 
-        return NodePos{ .layer_pos = layer_pos,
-                        .ply_pos = ply_pos,
-                        .node_pos = node_pos
+        return NodePosition{ .layerPos = layer_pos,
+            .plyPos = ply_pos,
+            .nodePos = node_pos
         };
     }
 
-    std::vector<Layer>& GetData() { return layers_; }
+    std::vector<Layer>& getData() { return layers_; }
 
     void ReserveLayers(size_t size) { layers_.reserve(size); }
     size_t LayersCount() const noexcept { return layers_.size(); }
-    bool IsEmpty() const { return layers_.empty(); }
+    bool isEmpty() const { return layers_.empty(); }
 
     Layer& AddLayer() {
         return layers_.emplace_back(Layer{});
@@ -168,66 +168,66 @@ public:
         return layers_.at(index);
     }
 
-    Node& InsertNode(const NodePos pos, Node&& node) {
-        Ply& ply = GetLayer(pos.layer_pos).GetPly(pos.ply_pos);
-        Node& new_node = ply.InsertNode(pos.node_pos, std::move(node));
-        new_node.pos = pos;
-        
-        for (size_t i = pos.node_pos + 1; i < ply.PointsCount(); ++i) {
+    Node& InsertNode(const NodePosition pos, Node&& node) {
+        Ply& ply = GetLayer(pos.layerPos).GetPly(pos.plyPos);
+        Node& new_node = ply.InsertNode(pos.nodePos, std::move(node));
+        new_node.position = pos;
+
+        for (size_t i = pos.nodePos + 1; i < ply.PointsCount(); ++i) {
             Node& node = ply.GetNode(i);
-            ++node.pos.node_pos;
-            if (node.bottom_pos.has_value()) {
-                ++GetNode(node.bottom_pos.value()).top_pos.value().node_pos;
+            ++node.position.nodePos;
+            if (node.lowerLink.has_value()) {
+                ++GetNode(node.lowerLink.value()).upperLink.value().nodePos;
             }
-            if (node.top_pos.has_value()) {
-                ++GetNode(node.top_pos.value()).bottom_pos.value().node_pos;
+            if (node.upperLink.has_value()) {
+                ++GetNode(node.upperLink.value()).lowerLink.value().nodePos;
             }
         }
         return new_node;
     }
 
-    NodePos GetStartNodePos() const {
+    NodePosition GetStartNodePos() const {
         assert(!layers_.empty() && "Data is empty");
-        Node result = GetNode(NodePos{ .layer_pos = 0, .ply_pos = 0, .node_pos = 0 });
+        Node result = GetNode(NodePosition{ .layerPos = 0, .plyPos = 0, .nodePos = 0 });
         Node node = result;
-        while (node.top_pos.has_value()) {
-            node = GetNode(node.top_pos.value());
-            if (node.pos.node_pos != 0) {
-                node = GetLayer(node.pos.layer_pos).GetPly(node.pos.ply_pos).GetFirstNode();
+        while (node.upperLink.has_value()) {
+            node = GetNode(node.upperLink.value());
+            if (node.position.nodePos != 0) {
+                node = GetLayer(node.position.layerPos).GetPly(node.position.plyPos).GetFirstNode();
                 result = node;
             }
         }
-        return result.pos;
+        return result.position;
     }
 
-    NodePos GetLowestNodePos(const NodePos pos) const {
+    NodePosition GetLowestNodePos(const NodePosition pos) const {
         Node node = GetNode(pos);
 
-        while (node.bottom_pos.has_value()) {
-            node = GetNode(node.bottom_pos.value());
+        while (node.lowerLink.has_value()) {
+            node = GetNode(node.lowerLink.value());
         }
 
-        return node.pos;
+        return node.position;
     }
 
-    NodePos GetTopMostNodePos(const NodePos pos) const {
+    NodePosition GetTopMostNodePos(const NodePosition pos) const {
         Node node = GetNode(pos);
 
-        while (node.top_pos.has_value()) {
-            node = GetNode(node.top_pos.value());
+        while (node.upperLink.has_value()) {
+            node = GetNode(node.upperLink.value());
         }
 
-        return node.pos;
+        return node.position;
     }
 
-    bool IsLastNodeInPly(const NodePos pos) const {
-        size_t size = GetLayer(pos.layer_pos).GetPly(pos.ply_pos).PointsCount() - 1;
+    bool IsLastNodeInPly(const NodePosition pos) const {
+        size_t size = GetLayer(pos.layerPos).GetPly(pos.plyPos).PointsCount() - 1;
         return static_cast<unsigned short>(size)
-            == pos.node_pos;
+               == pos.nodePos;
     }
 
-    bool IsFirstNodeInPly(const NodePos pos) const {
-        return static_cast <unsigned short>(0) == pos.node_pos;
+    bool IsFirstNodeInPly(const NodePosition pos) const {
+        return static_cast <unsigned short>(0) == pos.nodePos;
     }
 
 private:

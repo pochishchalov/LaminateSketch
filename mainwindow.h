@@ -13,33 +13,33 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-struct DrawableLayer{
-    QPolygonF polyline_;
-    Qt::PenStyle style_ = Qt::PenStyle::NoPen;
-};
-
-class DrawableSketch{
+class Sketch {
 public:
-    DrawableSketch()
-        :width_(0)
-        ,height_(0)
+    explicit Sketch(ls::Iface& interface)
+        : m_interface(interface)
     {
     }
 
-    void CreateSketch(ls::Iface& sketch, QRect window);
-    void SetOrigin(QRect window);
-    QPoint GetOrigin() const { return origin_; }
-    int GetWidth() const { return width_; }
-    int GetHeight() const { return height_; }
-    bool IsEmpty() { return sketch_.empty(); }
-    void DrawSketch(QPainter* painter);
-    void UpdateSketch(ls::Iface &sketch, QRect window);
+    void create(QRect window);
+    void setOrigin(QRect window);
+    QPoint origin() const { return m_origin; }
+    int width() const { return m_width; }
+    int height() const { return m_height; }
+    bool isEmpty() const { return m_layers.empty(); }
+    void draw(QPainter* painter) const;
+    void update(QRect window, double offset, double length);
 
 private:
-    std::vector<DrawableLayer> sketch_;
-    int width_;
-    int height_;
-    QPoint origin_;
+    struct Layer {
+        QPolygonF polyline;
+        Qt::PenStyle penStyle = Qt::NoPen;
+    };
+
+    std::vector<Layer> m_layers;
+    ls::Iface& m_interface;
+    int m_width = 0;
+    int m_height = 0;
+    QPoint m_origin;
 };
 
 class MainWindow : public QMainWindow
@@ -47,33 +47,35 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+
+    constexpr static int PANEL_SIZE = 120;
+    constexpr static int PIX_IN_CM = 30;
+
+    explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    const static int PANEL_SIZE = 120;
-    const static int PIX_IN_CM = 30;
+    void drawBackground(QPainter* painter, QRect window);
+    void drawAxis(QPainter* painter, QPoint origin, QRect window, QRect sketch);
+    void setStatusMessage(const QString& message);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
-
     void paintEvent(QPaintEvent* event) override;
 
 private slots:
     void on_btn_open_file_clicked();
-
     void on_btn_save_file_clicked();
-
-    void on_sb_offset_valueChanged(double arg1);
-
-    void on_sb_length_valueChanged(double arg1);
+    void on_sb_offset_valueChanged(double offset);
+    void on_sb_length_valueChanged(double length);
 
 private:
     Ui::MainWindow *ui;
 
-    dx::Handler handler_;
-    ls::Iface sketch_;
-    DrawableSketch drawable_sketch_;
-    double offset_ = ls::Iface::DEFAULT_OFFSET;
-    double length_ = ls::Iface::DEFAULT_SEG_LEN;
+    dx::Handler m_dxHandler;
+    ls::Iface m_interface;
+    Sketch m_sketch;
+    double m_offset = ls::Iface::DEFAULT_OFFSET;
+    double m_length = ls::Iface::DEFAULT_SEG_LEN;
 };
+
 #endif // MAINWINDOW_H

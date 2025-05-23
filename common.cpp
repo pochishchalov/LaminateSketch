@@ -48,9 +48,9 @@ bool IsPointInPolygon(const Point& test, const Polygon& polygon) {
 
     bool is_inside = false;
 
-    for (size_t i = 0, j = polygon.GetNumOfPoints() - 1; i < polygon.GetNumOfPoints(); j = i++) {
-        const Point& p1 = polygon.GetPoints()[i];
-        const Point& p2 = polygon.GetPoints()[j];
+    for (size_t i = 0, j = polygon.pointsCount() - 1; i < polygon.pointsCount(); j = i++) {
+        const Point& p1 = polygon.points()[i];
+        const Point& p2 = polygon.points()[j];
 
         // Проверка на совпадение с вершиной
         if (ApproximatelyEqual(test.x, p1.x) && ApproximatelyEqual(test.y, p1.y)) {
@@ -249,7 +249,7 @@ RawPolyline RemoveExtraDots(const RawPolyline& input, double abs_epsilon, double
     RawPolyline result;
     if (input.polyline.empty()) return result;
 
-    result.ori = input.ori;
+    result.orientation = input.orientation;
     result.polyline.reserve(input.polyline.size());
 
     // Всегда добавляем первую точку
