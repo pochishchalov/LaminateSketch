@@ -15,7 +15,7 @@ QT_END_NAMESPACE
 
 class Sketch {
 public:
-    explicit Sketch(ls::Iface& interface)
+    explicit Sketch(ls::Interface& interface)
         : m_interface(interface)
     {
     }
@@ -36,7 +36,7 @@ private:
     };
 
     std::vector<Layer> m_layers;
-    ls::Iface& m_interface;
+    ls::Interface& m_interface;
     int m_width = 0;
     int m_height = 0;
     QPoint m_origin;
@@ -48,8 +48,8 @@ class MainWindow : public QMainWindow
 
 public:
 
-    constexpr static int PANEL_SIZE = 120;
-    constexpr static int PIX_IN_CM = 30;
+    constexpr static int PanelSize = 120;
+    constexpr static int PixInCm = 30;
 
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -72,10 +72,10 @@ private:
     Ui::MainWindow *ui;
 
     dx::Handler m_dxHandler;
-    ls::Iface m_interface;
+    ls::Interface m_interface;
     Sketch m_sketch;
-    double m_offset = ls::Iface::DEFAULT_OFFSET;
-    double m_length = ls::Iface::DEFAULT_SEG_LEN;
+    double m_offset = ls::Interface::DefaultOffset;
+    double m_length = ls::Interface::DefaultSegLen;
 };
 
 #endif // MAINWINDOW_H

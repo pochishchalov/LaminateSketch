@@ -7,7 +7,7 @@
 
 void Sketch::create(QRect window)
 {
-    const int pixPerMm = MainWindow::PIX_IN_CM / 10;
+    const int pixPerMm = MainWindow::PixInCm / 10;
 
     m_width = static_cast<int>(m_interface.width() * pixPerMm);
     m_height = static_cast<int>(m_interface.height() * pixPerMm);
@@ -43,7 +43,7 @@ void Sketch::setOrigin(QRect window)
 {
     const QPoint newOrigin{
         (window.width() - m_width) / 2,
-        window.height() - MainWindow::PANEL_SIZE - (window.height() - MainWindow::PANEL_SIZE - m_height) / 2
+        window.height() - MainWindow::PanelSize - (window.height() - MainWindow::PanelSize - m_height) / 2
     };
 
     const int dy = newOrigin.y() - m_origin.y();
@@ -166,8 +166,8 @@ void MainWindow::drawBackground(QPainter* painter, QRect window)
 
 void MainWindow::drawAxis(QPainter* painter, QPoint origin, QRect window, QRect sketch)
 {
-    constexpr int pixPerCm = MainWindow::PIX_IN_CM;
-    constexpr int panelSize = MainWindow::PANEL_SIZE;
+    constexpr int pixPerCm = MainWindow::PixInCm;
+    constexpr int panelSize = MainWindow::PanelSize;
 
     const QPen oldPen = painter->pen();
     QPen axisPen(Qt::white);

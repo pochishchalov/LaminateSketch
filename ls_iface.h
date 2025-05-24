@@ -9,15 +9,15 @@
 
 namespace ls {  // laminate sketch
 
-class Iface {
+class Interface {
 public:
-    const static int DEFAULT_OFFSET = 1;
-    const static int DEFAULT_SEG_LEN = 20;
+    const static int DefaultOffset = 1;
+    const static int DefaultSegLen = 5;
 
-    Iface()
+    Interface()
         :width_(0.)
         ,height_(0.)
-        ,min_distance_between_plies_(0.)
+        ,minDistanceBetweenPlies_(0.)
     {
     }
 
@@ -39,17 +39,11 @@ public:
     void optimizeSketch(double offset, double segment_len);
 
 private:
-    Data original_data_;
-    Data optimized_data_;
+    LaminateData original_data_;
+    LaminateData optimized_data_;
     double width_;
     double height_;
-    double min_distance_between_plies_;
+    double minDistanceBetweenPlies_;
 };
 
 }  // namespace ls
-
-namespace domain {
-
-bool IsUpperPolyline(const Polyline& input, const RawData& raw_sketch);
-
-} //namespace domain

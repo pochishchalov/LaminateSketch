@@ -59,69 +59,68 @@ protected:
 struct Ply : VectorWrapper<Node> {
     domain::Orientation orientation = domain::Orientation::Zero;
 
-    Node& AddNode(Node&& node) {
-        return data_.emplace_back(std::move(node));
-    }
-    Node& AddNode(const Node& node) {
-        return data_.emplace_back(node);
+    template <typename NodeT>
+    Node& addNode(NodeT&& node) {
+        return data_.emplace_back(std::forward<NodeT>(node));
     }
 
-    Node& InsertNode(size_t index, Node&& node) {
+    Node& insertNode(size_t index, Node&& node) {
         return *data_.emplace(data_.begin() + index, std::move(node));
     }
 
-    Node& GetNode(size_t index) {
+    Node& getNode(size_t index) {
         return data_.at(index);
     }
-    const Node& GetNode(size_t index) const {
+    const Node& getNode(size_t index) const {
         return data_.at(index);
     }
-    Node& GetFirstNode() {
-        return *data_.begin();
+    Node& firstNode() {
+        return data_.front();
     }
-    const Node& GetFirstNode() const {
-        return *data_.begin();
+    const Node& firstNode() const {
+        return data_.front();
     }
-    Node& GetLastNode() {
+    Node& lastNode() {
         return data_.back();
     }
-    const Node& GetLastNode() const {
+    const Node& lastNode() const {
         return data_.back();
     }
 
-    size_t PointsCount() const noexcept { return data_.size(); }
-
-    void OffsetPly(double offset) {
-        domain::Polyline poly;
-        poly.reserve(PointsCount());
-        for (const auto& node : data_) {
-            poly.emplace_back(domain::Point{ node.point });
-        }
-        poly = domain::OffsetPolyline(poly, offset);
-        for (size_t i = 0; i < poly.size(); ++i) {
-            data_[i].point = poly[i];
-        }
-    }
-
+    size_t pointsCount() const noexcept { return data_.size(); }
 };
 
 struct Layer : VectorWrapper<Ply> {
-    Ply& AddPly() {
+    Ply& addPly() {
         return data_.emplace_back(Ply{});
     }
 
-    Ply& GetPly(size_t index) {
+    Ply& getPly(size_t index) {
         return data_.at(index);
     }
 
-    const Ply& GetPly(size_t index) const {
+    const Ply& getPly(size_t index) const {
         return data_.at(index);
     }
 
-    size_t PliesCount() const noexcept { return data_.size(); }
+    size_t pliesCount() const noexcept { return data_.size(); }
 };
 
-class Data {
+class LaminateData {
+    void updatePositionsAfterInsertion(NodePosition pos) {
+        auto& ply = getLayer(pos.layerPos).getPly(pos.plyPos);
+
+        for (size_t i = pos.nodePos + 1; i < ply.pointsCount(); ++i) {
+            Node& current = ply.getNode(i);
+            ++current.position.nodePos;
+            if (current.lowerLink.has_value()) {
+                ++getNode(current.lowerLink.value()).upperLink.value().nodePos;
+            }
+            if (current.upperLink.has_value()) {
+                ++getNode(current.upperLink.value()).lowerLink.value().nodePos;
+            }
+        }
+    }
 public:
 
     using Iterator = std::vector<Layer>::iterator;
@@ -132,15 +131,15 @@ public:
     ConstIterator begin() const noexcept { return layers_.begin(); }
     ConstIterator end() const noexcept { return layers_.end(); }
 
-    Node& GetNode(const NodePosition pos) {
+    Node& getNode(const NodePosition pos) {
         return layers_[pos.layerPos][pos.plyPos][pos.nodePos];
     }
 
-    const Node& GetNode(const NodePosition pos) const {
+    const Node& getNode(const NodePosition pos) const {
         return layers_[pos.layerPos][pos.plyPos][pos.nodePos];
     }
 
-    NodePosition GetLastNodePos() {
+    NodePosition lastNodePos() {
         unsigned short layer_pos = static_cast<unsigned short>(layers_.size() - 1);
         unsigned short ply_pos = static_cast<unsigned short>(layers_[layer_pos].size() - 1);
         unsigned short node_pos = static_cast<unsigned short>(layers_[layer_pos][ply_pos].size() - 1);
@@ -153,80 +152,71 @@ public:
 
     std::vector<Layer>& getData() { return layers_; }
 
-    void ReserveLayers(size_t size) { layers_.reserve(size); }
-    size_t LayersCount() const noexcept { return layers_.size(); }
+    void reserveLayers(size_t size) { layers_.reserve(size); }
+    size_t layersCount() const noexcept { return layers_.size(); }
     bool isEmpty() const { return layers_.empty(); }
 
-    Layer& AddLayer() {
+    Layer& addLayer() {
         return layers_.emplace_back(Layer{});
     }
 
-    Layer& GetLayer(size_t index) {
+    Layer& getLayer(size_t index) {
         return layers_.at(index);
     }
-    const Layer& GetLayer(size_t index) const {
+    const Layer& getLayer(size_t index) const {
         return layers_.at(index);
     }
 
-    Node& InsertNode(const NodePosition pos, Node&& node) {
-        Ply& ply = GetLayer(pos.layerPos).GetPly(pos.plyPos);
-        Node& new_node = ply.InsertNode(pos.nodePos, std::move(node));
-        new_node.position = pos;
+    Node& insertNode(const NodePosition pos, Node&& node) {
+        Ply& ply = getLayer(pos.layerPos).getPly(pos.plyPos);
 
-        for (size_t i = pos.nodePos + 1; i < ply.PointsCount(); ++i) {
-            Node& node = ply.GetNode(i);
-            ++node.position.nodePos;
-            if (node.lowerLink.has_value()) {
-                ++GetNode(node.lowerLink.value()).upperLink.value().nodePos;
-            }
-            if (node.upperLink.has_value()) {
-                ++GetNode(node.upperLink.value()).lowerLink.value().nodePos;
-            }
-        }
-        return new_node;
+        Node& newNode = ply.insertNode(pos.nodePos, std::move(node));
+        newNode.position = pos;
+
+        updatePositionsAfterInsertion(pos);
+
+        return newNode;
     }
 
-    NodePosition GetStartNodePos() const {
+    NodePosition findRootNode() const {
         assert(!layers_.empty() && "Data is empty");
-        Node result = GetNode(NodePosition{ .layerPos = 0, .plyPos = 0, .nodePos = 0 });
+        Node result = getNode(NodePosition{ .layerPos = 0, .plyPos = 0, .nodePos = 0 });
         Node node = result;
         while (node.upperLink.has_value()) {
-            node = GetNode(node.upperLink.value());
+            node = getNode(node.upperLink.value());
             if (node.position.nodePos != 0) {
-                node = GetLayer(node.position.layerPos).GetPly(node.position.plyPos).GetFirstNode();
+                node = getLayer(node.position.layerPos).getPly(node.position.plyPos).firstNode();
                 result = node;
             }
         }
         return result.position;
     }
 
-    NodePosition GetLowestNodePos(const NodePosition pos) const {
-        Node node = GetNode(pos);
+    NodePosition traceToBottom(const NodePosition start) const {
+        NodePosition current = start;
 
-        while (node.lowerLink.has_value()) {
-            node = GetNode(node.lowerLink.value());
+        while (const auto& link = getNode(current).lowerLink) {
+            current = *link;
         }
-
-        return node.position;
+        return current;
     }
 
-    NodePosition GetTopMostNodePos(const NodePosition pos) const {
-        Node node = GetNode(pos);
+    NodePosition traceToTop(const NodePosition start) const {
+        NodePosition current = start;
 
-        while (node.upperLink.has_value()) {
-            node = GetNode(node.upperLink.value());
+        while (const auto& link = getNode(current).upperLink) {
+            current = *link;
         }
-
-        return node.position;
+        return current;
     }
 
-    bool IsLastNodeInPly(const NodePosition pos) const {
-        size_t size = GetLayer(pos.layerPos).GetPly(pos.plyPos).PointsCount() - 1;
+    bool isLastPlyNode(const NodePosition pos) const {
+        size_t size = getLayer(pos.layerPos).getPly(pos.plyPos).pointsCount() - 1;
         return static_cast<unsigned short>(size)
                == pos.nodePos;
     }
 
-    bool IsFirstNodeInPly(const NodePosition pos) const {
+    bool isFirstPlyNode(const NodePosition pos) const {
         return static_cast <unsigned short>(0) == pos.nodePos;
     }
 

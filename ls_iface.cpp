@@ -117,30 +117,30 @@ std::pair<bool, bool> TryConnectIntersection(const std::optional<Point>& interse
 }
 
 // Соединяет неиспользованные точки с сегментом граниченным узлами first и last
-void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
+void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::LaminateData& data,
                           std::vector<std::pair<ls::NodePosition, bool>>& unused_nodes)
 {
     for (auto& [node_pos, is_tied] : unused_nodes) {
 
-        ls::Node& connectable = data.GetNode(node_pos);
+        ls::Node& connectable = data.getNode(node_pos);
 
         if (connectable.lowerLink.has_value()) {
             continue;
         }
 
-        const bool is_first_node = data.IsFirstNodeInPly(node_pos);
-        const bool is_last_node = data.IsLastNodeInPly(node_pos);
+        const bool is_first_node = data.isFirstPlyNode(node_pos);
+        const bool is_last_node = data.isLastPlyNode(node_pos);
 
         std::vector<ls::Node*> neighbors;
         // Соседний узел слева
         if (!is_first_node) {
-            neighbors.push_back(&data.GetNode(ls::NodePosition{
+            neighbors.push_back(&data.getNode(ls::NodePosition{
                                                           node_pos.layerPos, node_pos.plyPos,
                                                           static_cast<unsigned short>(node_pos.nodePos - 1) }));
         }
         // Соседний узел справа
         if (!is_last_node) {
-            neighbors.push_back(&data.GetNode(ls::NodePosition{
+            neighbors.push_back(&data.getNode(ls::NodePosition{
                                                           node_pos.layerPos, node_pos.plyPos,
                                                           static_cast<unsigned short>(node_pos.nodePos + 1) }));
         }
@@ -209,7 +209,7 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
                 }
             }
 
-            ls::Node& new_node = data.InsertNode(second.position, ls::Node{ .point = intersection_point, .position = second.position });
+            ls::Node& new_node = data.insertNode(second.position, ls::Node{ .point = intersection_point, .position = second.position });
             new_node.upperLink.emplace(connectable.position);
             connectable.lowerLink.emplace(new_node.position);
             is_tied = true;
@@ -217,21 +217,21 @@ void ConnectLineWithNodes(ls::Node& first, ls::Node& second, ls::Data& data,
     }
 }
 
-void ConnectNodes(ls::Ply& ply, ls::Data& data, std::vector<std::pair<ls::NodePosition, bool>>& unused_nodes) {
+void ConnectNodes(ls::Ply& ply, ls::LaminateData& data, std::vector<std::pair<ls::NodePosition, bool>>& unused_nodes) {
     // Вызов GetLastNode() необходим каждый раз, т.к. в сегмент 'ply' могут добавляться новые узлы
-    for (auto pos = ply.GetFirstNode().position; pos <= ply.GetLastNode().position; ++pos.nodePos) {
+    for (auto pos = ply.firstNode().position; pos <= ply.lastNode().position; ++pos.nodePos) {
         if (pos.nodePos != 0) {
-            ls::Node& first = data.GetNode(ls::NodePosition{ .layerPos = pos.layerPos,
+            ls::Node& first = data.getNode(ls::NodePosition{ .layerPos = pos.layerPos,
                                                        .plyPos = pos.plyPos,
                                                        .nodePos = static_cast<unsigned short>(pos.nodePos - 1) });
-            ls::Node& second = data.GetNode(pos);
+            ls::Node& second = data.getNode(pos);
 
             ConnectLineWithNodes(first, second, data, unused_nodes);
         }
     }
 }
 
-void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
+void AddLayer(std::vector<RawData::iterator> upper_plies, ls::LaminateData& data,
               std::vector<std::pair<ls::NodePosition, bool>>& unused_nodes)
 {
     // Сортировка сегментов слева направо
@@ -240,15 +240,15 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
                   return lhs->polyline.begin()->x < rhs->polyline.begin()->x;
               });
 
-    const unsigned short layer_pos = data.LayersCount(); // Опережающее присвоение чтобы не вычитать единицу
-    auto& new_layer = data.AddLayer();
+    const unsigned short layer_pos = data.layersCount(); // Опережающее присвоение чтобы не вычитать единицу
+    auto& new_layer = data.addLayer();
     new_layer.reserve(upper_plies.size());
 
     const bool is_first_layer = (layer_pos == 0);
 
     for (auto& ply : upper_plies) {
-        const unsigned short ply_pos = data.GetLayer(layer_pos).PliesCount(); // Опережающее присвоение чтобы не вычитать единицу
-        auto& new_ply = new_layer.AddPly();
+        const unsigned short ply_pos = data.getLayer(layer_pos).pliesCount(); // Опережающее присвоение чтобы не вычитать единицу
+        auto& new_ply = new_layer.addPly();
 
         const auto points_count = ply->pointsCount();
 
@@ -257,7 +257,7 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
 
         // Добавляем узлы в сегмент
         for (unsigned short i = 0; i < points_count; ++i) {
-            new_ply.AddNode(ls::Node{
+            new_ply.addNode(ls::Node{
                 .point = ply->pointAt(i),
                 .position = {.layerPos = layer_pos,
                         .plyPos = ply_pos,
@@ -280,7 +280,7 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
     // Узлы нового сегмента добавляются к неиспользованным
     size_t total_nodes = 0;
     for (const auto& ply : new_layer) {
-        total_nodes += ply.PointsCount();
+        total_nodes += ply.pointsCount();
     }
     unused_nodes.reserve(unused_nodes.size() + total_nodes);
 
@@ -295,9 +295,9 @@ void AddLayer(std::vector<RawData::iterator> upper_plies, ls::Data& data,
     }
 }
 
-void ReverseLayers(ls::Data& data) {
+void ReverseLayers(ls::LaminateData& data) {
 
-    unsigned short correction_pos = data.LayersCount() - 1;
+    unsigned short correction_pos = data.layersCount() - 1;
 
     // Переворачиваем layer_pos в позиции узлов
     for (auto& layer : data) {
@@ -316,9 +316,9 @@ void ReverseLayers(ls::Data& data) {
     std::reverse(data.begin(), data.end());
 }
 
-ls::Data ConvertRawSketch(RawData&& raw_sketch) {
-    ls::Data result;
-    result.ReserveLayers(raw_sketch.size()); // Слоев не может быть больше чем ломаных в сыром эскизе
+ls::LaminateData ConvertRawSketch(RawData&& raw_sketch) {
+    ls::LaminateData result;
+    result.reserveLayers(raw_sketch.size()); // Слоев не может быть больше чем ломаных в сыром эскизе
 
     StartPointOptimization(raw_sketch);    // Переворачиваем линии эскиза если они идут справа налево
 
@@ -342,7 +342,7 @@ ls::Data ConvertRawSketch(RawData&& raw_sketch) {
     return result;
 }
 
-void ScaleLayers(ls::Data& layers, double scale)
+void ScaleLayers(ls::LaminateData& layers, double scale)
 {
     for (auto& layer : layers) {
         for (auto& ply : layer) {
@@ -354,42 +354,42 @@ void ScaleLayers(ls::Data& layers, double scale)
     }
 }
 
-std::optional<ls::NodePosition> TryGetNextPos(const ls::NodePosition pos, ls::Data& layers) {
-    if (!layers.IsLastNodeInPly(pos)) {
-        return layers.GetLayer(pos.layerPos).GetPly(pos.plyPos).GetNode(pos.nodePos + 1).position;
+std::optional<ls::NodePosition> TryGetNextPos(const ls::NodePosition pos, ls::LaminateData& layers) {
+    if (!layers.isLastPlyNode(pos)) {
+        return layers.getLayer(pos.layerPos).getPly(pos.plyPos).getNode(pos.nodePos + 1).position;
     }
-    ls::Node& node = layers.GetNode(pos);
+    ls::Node& node = layers.getNode(pos);
     if (node.upperLink.has_value()) {
         return TryGetNextPos(node.upperLink.value(), layers);
     }
     return std::nullopt;
 }
 
-double GetMinDistanceGroupNodes(const ls::NodePosition pos, ls::Data& layers) {
-    ls::Node node = layers.GetNode(pos);
+double GetMinDistanceGroupNodes(const ls::NodePosition pos, ls::LaminateData& layers) {
+    ls::Node node = layers.getNode(pos);
 
     double result = std::numeric_limits<double>::max();
 
     while (node.upperLink.has_value()) {
-        ls::Node top_node = layers.GetNode(node.upperLink.value());
+        ls::Node top_node = layers.getNode(node.upperLink.value());
         result = std::min(result, DistanceBetweenPoints(node.point, top_node.point));
-        node = layers.GetNode(top_node.position);
+        node = layers.getNode(top_node.position);
     }
 
     return result;
 }
 
-double GetMinDistanceBetweenPlies(ls::Data& layers) {
+double GetMinDistanceBetweenPlies(ls::LaminateData& layers) {
 
     double result = std::numeric_limits<double>::max();
 
-    auto pos = layers.GetStartNodePos();
+    auto pos = layers.findRootNode();
 
     while (true) {
         result = std::min(result, GetMinDistanceGroupNodes(pos, layers));
         auto next_pos = TryGetNextPos(pos, layers);
         if (next_pos.has_value()) {
-            pos = layers.GetLowestNodePos(next_pos.value());
+            pos = layers.traceToBottom(next_pos.value());
         }
         else {
             break;
@@ -398,16 +398,16 @@ double GetMinDistanceBetweenPlies(ls::Data& layers) {
     return result;
 }
 
-double GetMinDistanceBetweenGroupNodes(const ls::NodePosition first, const ls::NodePosition second, ls::Data& layers) {
-    ls::Node first_node = layers.GetNode(first);
-    ls::Node second_node = layers.GetNode(second);
+double GetMinDistanceBetweenGroupNodes(const ls::NodePosition first, const ls::NodePosition second, ls::LaminateData& layers) {
+    ls::Node first_node = layers.getNode(first);
+    ls::Node second_node = layers.getNode(second);
 
     double result = DistanceBetweenPoints(first_node.point, second_node.point);
 
     while (true) {
         if (first_node.upperLink.has_value() && second_node.upperLink.has_value()) {
-            first_node = layers.GetNode(first_node.upperLink.value());
-            second_node = layers.GetNode(second_node.upperLink.value());
+            first_node = layers.getNode(first_node.upperLink.value());
+            second_node = layers.getNode(second_node.upperLink.value());
             result = std::min(result, DistanceBetweenPoints(first_node.point, second_node.point));
         }
         else {
@@ -418,9 +418,9 @@ double GetMinDistanceBetweenGroupNodes(const ls::NodePosition first, const ls::N
     return result;
 }
 
-void CompressPairGroupNodes(const ls::NodePosition first, const ls::NodePosition second, ls::Data& layers, double max_distance) {
-    ls::Node first_node = layers.GetNode(first);
-    ls::Node second_node = layers.GetNode(second);
+void CompressPairGroupNodes(const ls::NodePosition first, const ls::NodePosition second, ls::LaminateData& layers, double max_distance) {
+    ls::Node first_node = layers.getNode(first);
+    ls::Node second_node = layers.getNode(second);
 
     auto mid_point = GetPointOnRay(first_node.point, second_node.point, max_distance);
     double dx = second_node.point.x - mid_point.x;
@@ -431,7 +431,7 @@ void CompressPairGroupNodes(const ls::NodePosition first, const ls::NodePosition
     while (true) {
         auto temp_pos = pos;
         while (true) {
-            ls::Node& changed_node = layers.GetNode(temp_pos);
+            ls::Node& changed_node = layers.getNode(temp_pos);
             changed_node.point.x -= dx;
             changed_node.point.y -= dy;
             if (changed_node.upperLink.has_value()) {
@@ -443,7 +443,7 @@ void CompressPairGroupNodes(const ls::NodePosition first, const ls::NodePosition
         }
         auto next_pos = TryGetNextPos(pos, layers);
         if (next_pos.has_value()) {
-            pos = layers.GetLowestNodePos(next_pos.value());
+            pos = layers.traceToBottom(next_pos.value());
         }
         else {
             break;
@@ -451,8 +451,8 @@ void CompressPairGroupNodes(const ls::NodePosition first, const ls::NodePosition
     }
 }
 
-void CompressSketch(ls::Data& layers, double max_distance) {
-    auto first = layers.GetStartNodePos();
+void CompressSketch(ls::LaminateData& layers, double max_distance) {
+    auto first = layers.findRootNode();
     auto second = TryGetNextPos(first, layers).value();
 
     while (true) {
@@ -463,7 +463,7 @@ void CompressSketch(ls::Data& layers, double max_distance) {
         auto next_pos = TryGetNextPos(second, layers);
         if (next_pos.has_value()) {
             first = second;
-            second = layers.GetLowestNodePos(next_pos.value());
+            second = layers.traceToBottom(next_pos.value());
         }
         else {
             break;
@@ -471,7 +471,7 @@ void CompressSketch(ls::Data& layers, double max_distance) {
     }
 }
 
-std::pair<double, double> CalculateWidthAndHeight(ls::Data& layers) {
+std::pair<double, double> CalculateWidthAndHeight(ls::LaminateData& layers) {
     double left = std::numeric_limits<double>::max();
     double bottom = std::numeric_limits<double>::max();
     double right = std::numeric_limits<double>::min();
@@ -498,7 +498,7 @@ namespace ls {
 
 using namespace domain;
 
-domain::RawData Iface::rawSketch() const {
+domain::RawData Interface::rawSketch() const {
     RawData result;
 
     for (const auto& layer : optimized_data_) {
@@ -516,7 +516,7 @@ domain::RawData Iface::rawSketch() const {
     return result;
 }
 
-bool Iface::fillSketch(domain::RawData&& raw_sketch) {
+bool Interface::fillSketch(domain::RawData&& raw_sketch) {
 
     MoveRawSketchToZero(raw_sketch);
 
@@ -529,22 +529,22 @@ bool Iface::fillSketch(domain::RawData&& raw_sketch) {
 
         original_data_ = (std::move(data));
 
-        min_distance_between_plies_ = GetMinDistanceBetweenPlies(original_data_);
+        minDistanceBetweenPlies_ = GetMinDistanceBetweenPlies(original_data_);
 
-        optimizeSketch(Iface::DEFAULT_OFFSET, Iface::DEFAULT_SEG_LEN);
+        optimizeSketch(Interface::DefaultOffset, Interface::DefaultSegLen);
 
         return true;
     }
 }
 
-void Iface::scaleSketch(double scale) {
+void Interface::scaleSketch(double scale) {
     ScaleLayers(optimized_data_, scale);
 }
 
-void Iface::optimizeSketch(double offset, double segment_len) {
+void Interface::optimizeSketch(double offset, double segment_len) {
     auto temp_layers_ = original_data_;
 
-    double scale = offset / min_distance_between_plies_;
+    double scale = offset / minDistanceBetweenPlies_;
 
     CompressSketch(temp_layers_, segment_len / scale);
 
