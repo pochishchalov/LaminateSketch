@@ -220,6 +220,10 @@ public:
         return static_cast <unsigned short>(0) == pos.nodePos;
     }
 
+    void clear(){
+        layers_.clear();
+    }
+
 private:
     std::vector<Layer> layers_;
 };

@@ -38,6 +38,8 @@ public:
 
     void optimizeSketch(double offset, double segment_len);
 
+    void clear();
+
 private:
     LaminateData original_data_;
     LaminateData optimized_data_;

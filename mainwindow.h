@@ -28,6 +28,7 @@ public:
     bool isEmpty() const { return m_layers.empty(); }
     void draw(QPainter* painter) const;
     void update(QRect window, double offset, double length);
+    void clear();
 
 private:
     struct Layer {
@@ -45,6 +46,12 @@ private:
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+
+    struct SaveFileSettings{
+        QString m_fileName;
+        bool m_isBinary = false;
+        DRW::Version m_version = DRW::Version::UNKNOWNV;
+    };
 
 public:
 
@@ -76,6 +83,7 @@ private:
     Sketch m_sketch;
     double m_offset = ls::Interface::DefaultOffset;
     double m_length = ls::Interface::DefaultSegLen;
+    SaveFileSettings m_saveFileSettings;
 };
 
 #endif // MAINWINDOW_H

@@ -557,4 +557,12 @@ void Interface::optimizeSketch(double offset, double segment_len) {
     std::swap(optimized_data_, temp_layers_);
 }
 
+void Interface::clear(){
+    original_data_.clear();
+    optimized_data_.clear();
+    width_= 0.;
+    height_ = 0.;
+    minDistanceBetweenPlies_ = 0.;
+}
+
 } // namespace ls

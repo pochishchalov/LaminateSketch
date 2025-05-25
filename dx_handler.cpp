@@ -102,13 +102,14 @@ void ConvertRawSketchToData(const domain::RawData& sketch, Data& data) {
 
 bool Handler::importFile(std::string file_name) {
     Iface input;
-
+    inputData = {};
     return input.fileImport(file_name, &inputData);
 }
 bool Handler::exportFile(std::string file_name, DRW::Version version, bool is_binary) {
     Iface output;
-
-    return output.fileExport(file_name, version, false, &outputData);
+    bool success = output.fileExport(file_name, version, is_binary, &outputData);
+    outputData = {};
+    return success;
 }
 
 domain::RawData Handler::getRawSketch() const {

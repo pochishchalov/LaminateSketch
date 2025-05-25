@@ -4,6 +4,9 @@
 #include <QIcon>
 #include <QFileDialog>
 #include <QString>
+#include <QMessageBox>
+#include <QComboBox>
+#include <QCheckBox>
 
 void Sketch::create(QRect window)
 {
@@ -79,6 +82,14 @@ void Sketch::update(QRect window, double offset, double length)
     create(window);
 }
 
+void Sketch::clear(){
+    m_layers.clear();
+    m_interface.clear();
+    m_width = 0;
+    m_height = 0;
+    m_origin = {};
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -95,8 +106,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     installEventFilter(ui->btn_open_file);
     installEventFilter(ui->btn_save_file);
-    installEventFilter(ui->cb_is_binary);
-    installEventFilter(ui->cb_format_selection);
     installEventFilter(ui->sb_length);
     installEventFilter(ui->sb_offset);
 }
@@ -134,14 +143,6 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
     }
     else if (obj == ui->btn_save_file) {
         if (type == QEvent::Enter) return setMessage(tr("Save to DXF file"));
-        if (type == QEvent::Leave) return setMessage("");
-    }
-    else if (obj == ui->cb_format_selection) {
-        if (type == QEvent::Enter) return setMessage(tr("Select file format"));
-        if (type == QEvent::Leave) return setMessage("");
-    }
-    else if (obj == ui->cb_is_binary) {
-        if (type == QEvent::Enter) return setMessage(tr("Use binary format"));
         if (type == QEvent::Leave) return setMessage("");
     }
     else if (obj == ui->sb_length) {
@@ -221,10 +222,33 @@ void MainWindow::drawAxis(QPainter* painter, QPoint origin, QRect window, QRect 
 
 void MainWindow::on_btn_open_file_clicked()
 {
-    const QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
-                                                          QDir::currentPath(), tr("DXF/DWG Files (*.dxf *.dwg)"));
 
-    if (fileName.isEmpty()) return;
+    if (!m_interface.isEmpty()){
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(
+            this, tr("Change File"),
+            tr("Save the open file?"),
+            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel
+            );
+        if (reply == QMessageBox::Yes){
+            on_btn_save_file_clicked();
+        }
+        else if (reply == QMessageBox::Cancel){
+            return;
+        }
+        m_sketch.clear();
+        m_saveFileSettings.m_fileName = "";
+    }
+
+    QFileDialog dialog;
+    dialog.setOption(QFileDialog::DontUseNativeDialog);
+    dialog.setNameFilter("DXF/DWG Files (*.dxf *.dwg)");
+
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const QString fileName = dialog.selectedFiles().first();
 
     if (m_dxHandler.importFile(fileName.toStdString())) {
         if (m_interface.fillSketch(m_dxHandler.getRawSketch())) {
@@ -242,27 +266,65 @@ void MainWindow::on_btn_open_file_clicked()
 
 void MainWindow::on_btn_save_file_clicked()
 {
-    const QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
-                                                          QDir::currentPath(), tr("DXF Files (*.dxf)"));
+    if (m_sketch.isEmpty()){
+        setStatusMessage(tr("Nothing to save. Open the file first"));
+        return;
+    }
 
-    if (fileName.isEmpty()) return;
+    QString fileName = m_saveFileSettings.m_fileName;
 
-    const DRW::Version version = [this]{
-        switch (ui->cb_format_selection->currentIndex()) {
-        case 0: return DRW::AC1027;
-        case 1: return DRW::AC1024;
-        case 2: return DRW::AC1021;
-        case 3: return DRW::AC1018;
-        case 4: return DRW::AC1015;
-        default: return DRW::UNKNOWNV;
+    if (fileName.isEmpty()){
+
+        QFileDialog dialog;
+        dialog.setAcceptMode(QFileDialog::AcceptSave);
+        dialog.setOption(QFileDialog::DontUseNativeDialog);
+        dialog.setNameFilter("DXF Files (*.dxf)");
+        dialog.setDefaultSuffix("dxf");
+
+        QComboBox *versionCombo = new QComboBox(&dialog);
+        versionCombo->addItems({"AC1027 (ACAD 2013)",
+                                "AC1024 (ACAD 2010)",
+                                "AC1021 (ACAD 2007)",
+                                "AC1018 (ACAD 2004)",
+                                "AC1015 (ACAD 2000)"});
+
+        QCheckBox *isBinary = new QCheckBox("Binary", &dialog);
+
+        QGridLayout *layout = static_cast<QGridLayout*>(dialog.layout());
+
+        int lastRow = layout->rowCount();
+        layout->addWidget(new QLabel("Version:"), lastRow, 0);
+        layout->addWidget(versionCombo, lastRow, 1);
+        layout->addWidget(isBinary, lastRow, 2);
+
+        if (dialog.exec() == QDialog::Accepted) {
+            const QString fileName = dialog.selectedFiles().first();
+
+            const DRW::Version version = [this, &versionCombo]{
+                switch (versionCombo->currentIndex()) {
+                case 0: return DRW::AC1027;
+                case 1: return DRW::AC1024;
+                case 2: return DRW::AC1021;
+                case 3: return DRW::AC1018;
+                case 4: return DRW::AC1015;
+                default: return DRW::UNKNOWNV;
+                }
+            }();
+
+            m_saveFileSettings.m_fileName = fileName;
+            m_saveFileSettings.m_isBinary = isBinary->isChecked();
+            m_saveFileSettings.m_version = version;
         }
-    }();
+        else {
+            return;
+        }
+    }
 
     m_dxHandler.putRawSketch(m_interface.rawSketch());
     const bool success = m_dxHandler.exportFile(
-        fileName.toStdString(),
-        version,
-        ui->cb_is_binary->isChecked()
+        m_saveFileSettings.m_fileName.toStdString(),
+        m_saveFileSettings.m_version,
+        m_saveFileSettings.m_isBinary
         );
 
     setStatusMessage(success ? tr("File saved successfully") : tr("Save failed"));
