@@ -7,7 +7,7 @@
 Специализированный 2D-редактор эскизов композиционных структур полученных в Fibersim
 
 <div id="mainwindow">
-  <img src="https://github.com/pochishchalov/LaminateSketch/blob/main/pictures/main_window.png?raw=true" width="800"/>
+  <img src="https://github.com/pochishchalov/LaminateSketch/blob/main/pictures/main_window.png?raw=true" width="1000"/>
 </div>
 
 - Принимает на вход данные в форматах DFX и DWG;
@@ -19,6 +19,9 @@
 ## Пример использования
 
 Редактор автоматизирует подготовку эскизов схемы укладки слоев композитного ламината, решая проблему визуального наложения слоев на чертеже. Даже при масштабе 1:1 тонкие слои (см. пример ниже) сливаются в сплошную заливку. Ручное увеличение масштаба элементов неэффективно расходует место.  
+<div id="conversation">
+  <img src="https://github.com/pochishchalov/LaminateSketch/blob/main/pictures/after_before_conversation.png?raw=true" width="1000"/>
+</div>
 
 Приложение позволяет гибко настраивать эскиз с помощью двух параметров: расстояния между слоями и длины сегмента. Примеры обработки, чертежей и видеоинструкция доступны в папках `examples` и `video`.
 
