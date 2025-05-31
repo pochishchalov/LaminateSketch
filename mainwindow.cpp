@@ -97,7 +97,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     setWindowIcon(QIcon(":/icons/app_icon.png"));
-    setMinimumSize(800, 600);
+    setMinimumSize(1280, 720);
 
     const auto installEventFilter = [this](QWidget* widget) {
         widget->setMouseTracking(true);
